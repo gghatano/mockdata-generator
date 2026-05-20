@@ -1,102 +1,117 @@
 ---
 name: synthesize
-description: タスクディレクトリ ($ARGUMENTS) の input/ を読み取り、合成データ生成パイプライン（0_spec_ingest → 1_generation_plan → 2_generator_impl → 3_evaluate_and_refine）を end-to-end で順次自動実行する。各ステップの Acceptance Criteria を満たさない場合は停止して報告する。
+description: 合成データ生成パイプラインの PM (project manager) エージェントとして起動する。タスクディレクトリ ($ARGUMENTS) の input/ を読み取り、4 つの SKILL (0_spec_ingest → 1_generation_plan → 2_generator_impl → 3_evaluate_and_refine) を順次サブエージェントに委譲し、各ステップの Acceptance Criteria 充足を確認しながら end-to-end で実行する。
 ---
 
-# synthesize
+# synthesize（PM エージェント）
 
-仕様駆動の合成データ生成パイプラインを **一発で end-to-end 実行する** マスタースキル。
+合成データ生成パイプラインの **PM エージェント** として動く。
+ユーザーの責務は `input/` を用意して `/synthesize <task_dir>` を呼ぶことだけ。あとはこの PM が4つの SKILL を順にサブエージェントに委譲する。
 
-ユーザーがやることは `input/` を整備することのみ。あとはこのスキルが 0→1→2→3 を順次回す。
+## 役割分担
+
+| 役割 | 担当 |
+|---|---|
+| ワークフロー全体の把握・順序制御 | PM エージェント（このスキル） |
+| Acceptance Criteria の確認 | PM エージェント |
+| 進捗報告 | PM エージェント |
+| 各ステップの実作業 | サブエージェント（4 体） |
+| タスク非依存の SKILL 仕様 | `.claude/skills/<step>/SKILL.md` |
+| タスク固有の仕様 | `$ARGUMENTS/input/` |
+
+PM 自身は **実装も評価も行わず**、各ステップをサブエージェントに丸ごと任せる。
 
 ## 引数
 
-`$ARGUMENTS` にタスクのルートディレクトリを受け取る。
+`$ARGUMENTS`: タスクのルートディレクトリ。
 例: `examples/university_enrollment`
 
-引数が空の場合は、`examples/` 配下のタスクディレクトリ一覧を提示してユーザーに選択を促す。
+引数が空の場合は、`examples/` 配下の候補一覧を提示してユーザーに選択を促す。
 
-## 前提（実行前チェック）
+## 起動前チェック（PM の責務）
 
-開始前に以下を確認する。1つでも欠ければユーザーに不足を報告して停止する。
+1. `$ARGUMENTS/input/` が存在することを確認。
+2. `input/` 配下に最低限以下が揃っていること：
+   - 1つ以上の `*table_definition*` ファイル
+   - 1つ以上の `*sample_data*` ファイル
+   - `data_spec.md`
+   - `constraints.md`
 
-- `$ARGUMENTS/input/` ディレクトリが存在する
-- `$ARGUMENTS/input/` 配下に以下のうち少なくとも以下4種が揃っている：
-  - 1つ以上の `*table_definition*` ファイル（.csv または .xlsx）
-  - 1つ以上の `*sample_data*` ファイル
-  - `data_spec.md`
-  - `constraints.md`
+不足があればユーザーに具体的に報告して停止する。サブエージェントは起動しない。
 
-## 実行手順
+## 実行フロー（PM の手順）
 
-以下の4ステップを **順番に** 実行する。各ステップは独立した SKILL として `.claude/skills/<step>/SKILL.md` に詳細が定義されているので、その内容に従う。
+各ステップで PM は以下を行う：
 
-### Step 0: 0_spec_ingest
+1. **サブエージェントを起動**: `Agent` ツールを使い、`subagent_type=general-purpose` を指定。
+2. **委譲内容**を簡潔に伝える（次の節「サブエージェント起動テンプレ」参照）。
+3. **完了報告**を受け取り、SKILL.md の Acceptance Criteria を満たしたか PM 自身で確認。
+4. **未達** なら、その旨を報告して停止（必要なら同サブエージェントを再起動して修正を依頼）。
+5. **OK** なら次のステップへ。
 
-- `.claude/skills/0_spec_ingest/SKILL.md` の指示に従い、`$ARGUMENTS/work/inferred_schema.json` と `$ARGUMENTS/work/constraint_plan.md` を作成する。
-- Acceptance Criteria（同 SKILL.md 末尾）を満たすことを確認してから次へ進む。
+### ステップ一覧
 
-### Step 1: 1_generation_plan
+| # | SKILL | 主な成果物 |
+|---|-------|-----------|
+| 0 | `0_spec_ingest` | `work/inferred_schema.json`, `work/constraint_plan.md` |
+| 1 | `1_generation_plan` | `work/generation_plan.md` |
+| 2 | `2_generator_impl` | `src/generator.py`, `output/<table>.csv` |
+| 3 | `3_evaluate_and_refine` | `src/evaluate.py`, `output/evaluation_report.md`, `output/constraints_check.csv` |
 
-- `.claude/skills/1_generation_plan/SKILL.md` の指示に従い、`$ARGUMENTS/work/generation_plan.md` を作成する。
-- Acceptance Criteria を確認してから次へ進む。
+### サブエージェント起動テンプレ
 
-### Step 2: 2_generator_impl
+`Agent` ツールに渡す `prompt` は次の構造に揃える。
 
-- `.claude/skills/2_generator_impl/SKILL.md` の指示に従い、`$ARGUMENTS/src/generator.py` を実装し、`$ARGUMENTS/output/<table>.csv` を生成する。
-- 必ず `uv run python $ARGUMENTS/src/generator.py …` を実行し、CSV が生成されることまで確認する。
-- Acceptance Criteria を確認してから次へ進む。
-
-### Step 3: 3_evaluate_and_refine
-
-- `.claude/skills/3_evaluate_and_refine/SKILL.md` の指示に従い、`$ARGUMENTS/src/evaluate.py` を実装し、評価レポートを生成する。
-- 必ず `uv run python $ARGUMENTS/src/evaluate.py …` を実行し、`evaluation_report.md` と `constraints_check.csv` が生成されることまで確認する。
-- 重大な制約違反が出た場合は、`generator.py` を修正して 2_generator_impl と 3_evaluate_and_refine を再実行する（最大2回まで）。
-
-## サブエージェント委譲（任意）
-
-タスクが大規模でメインコンテキストが圧迫されそうな場合は、各ステップを `Agent` ツール経由でサブエージェントに委譲してよい。
-その際は
-
-- 各エージェントに `$ARGUMENTS` と該当 SKILL.md のパスを渡し、
-- 完了後の主な成果物パスと Acceptance Criteria 充足の判定を簡潔に返してもらう
-
-ようにする。サブエージェント不要な小規模タスクは、メインのままで順次実行する。
-
-## 進捗報告
-
-ステップごとに **1行のステータス更新** をユーザーに返す（無言で進めない）。
-
-例：
 ```
-[0_spec_ingest] work/inferred_schema.json と constraint_plan.md を作成
-[1_generation_plan] work/generation_plan.md を作成
-[2_generator_impl] generator.py 実装 → output/synthetic_data.csv を10000行生成
-[3_evaluate_and_refine] 評価レポート出力。必須制約違反 0 件
+あなたは合成データ生成パイプラインの「<step_name>」サブエージェントです。
+
+タスクディレクトリ: <task_dir>
+従うべき SKILL 仕様: .claude/skills/<step_name>/SKILL.md
+直前ステップの成果物（読込のみ）: <list>
+あなたが生成すべき成果物: <list>
+
+SKILL.md の Tasks / Rules / Acceptance Criteria に厳密に従ってください。
+完了したら、生成したファイルのパス・件数・Acceptance Criteria を満たしているかどうかを
+200 字以内で報告してください。
 ```
 
-## 完了報告
+`description` は `"<step_name> 実行"` のように短く（例: `"0_spec_ingest 実行"`）。
 
-全ステップ成功時は、最後に以下をまとめて報告する。
+PM は **複数のサブエージェントを並列起動しない**（依存関係があるため、必ず逐次）。
 
-- 生成ファイルパス（output/, work/, src/）
-- 主な評価結果（制約違反件数、データ件数、主要分布の要約）
-- 改善が必要な点（あれば）
+## 進捗報告（PM が逐次出す）
+
+各ステップ開始時と完了時に、1〜2 行のステータスを出力する。
+
+```
+[0_spec_ingest] sub-agent 起動
+[0_spec_ingest] 完了: work/inferred_schema.json, work/constraint_plan.md
+[1_generation_plan] sub-agent 起動
+...
+```
+
+## 完了報告（最後に PM がまとめる）
+
+- 生成ファイルのパス一覧（work/, src/, output/）
+- 主な評価結果（制約違反件数、データ件数、主要分布の所見）
+- 既知の限界・注意点
+- 次に直接 Python を叩いて再生成する場合の例コマンド
 
 ## 失敗時の挙動
 
-- 前提チェックで不足があった場合: ユーザーに不足ファイルを明示して停止
-- 中間ステップが Acceptance Criteria を満たさない場合: そのステップでの問題を報告して停止
-- ステップ間でファイル整合が崩れた場合（例: schema にあるが sample にない列など）: 問題を提示してユーザーに判断を仰ぐ
+- **起動前チェック失敗**: 不足ファイルを明示して停止。
+- **サブエージェントが Acceptance Criteria を満たせない**: そのステップで停止。問題点とサブエージェントの最終報告を引用して提示。最大 1 回まで「修正してリトライ」を試みても良い。
+- **3_evaluate_and_refine で重大制約違反**: PM の判断で `2_generator_impl` のサブエージェントを再起動し、原因を伝えて修正させて良い（最大 1 回まで）。
 
 ## ルール
 
-- ユーザーが追加情報を与えていない限り、`input/` 配下のファイルだけを参照すること。
-- 個人情報を直接コピーしないこと。
-- 既に存在する `work/`, `src/`, `output/` のファイルは上書きする（ユーザー指示で incremental にしたい場合は別途オプション）。
+- PM は **コードを書かない、ファイルを編集しない**。すべての実作業をサブエージェントに委譲する。
+- サブエージェントへの指示は **タスク非依存**にする（タスク固有情報は `input/` を読みに行く形）。
+- 既に存在する `work/`, `src/`, `output/` の旧成果物は **上書きしてよい**。
+- 個人情報の直接コピーは禁止（サブエージェントへの指示にも含める）。
 
 ## 参考
 
-- 各 SKILL の詳細: `.claude/skills/<skill_name>/SKILL.md`
-- パイプラインの完全な仕様: `docs/spec.md`
+- 各 SKILL の本体: `.claude/skills/<step>/SKILL.md`
+- パイプライン仕様: `docs/spec.md`
 - 既存タスク例: `examples/customer/`, `examples/customer_transactions/`, `examples/university_enrollment/`
