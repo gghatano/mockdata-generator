@@ -4,4 +4,4 @@ __pycache__/
 *.pyo
 .DS_Store
 .python-version
-.claude/
+.claude/settings.local.json

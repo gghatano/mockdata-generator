@@ -53,7 +53,20 @@ mockdata-generator/
 5. `SKILL 3_evaluate_and_refine` に従い、`src/evaluate.py` を実装し、評価レポートを生成する。
 6. 必要に応じて、評価結果を踏まえて `generator.py` を修正する。
 
-各 SKILL の詳細・入力・出力・Acceptance Criteria は `docs/spec.md` を参照。
+各 SKILL の詳細・入力・出力・Acceptance Criteria は `docs/spec.md` および `.claude/skills/<skill_name>/SKILL.md` を参照。
+
+## SKILL の呼び出し（Claude Code）
+
+各ステップは Claude Code の SKILL として `.claude/skills/` に登録されている。タスクのルートディレクトリを `$ARGUMENTS` として渡す。
+
+```
+/0_spec_ingest         examples/university_enrollment
+/1_generation_plan     examples/university_enrollment
+/2_generator_impl      examples/university_enrollment
+/3_evaluate_and_refine examples/university_enrollment
+```
+
+スラッシュコマンドのほか、Claude が自動マッチで起動することもある（各 SKILL.md の `description` を参照）。
 
 ## 実行例
 
