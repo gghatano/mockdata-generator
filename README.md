@@ -3,29 +3,53 @@
 仕様駆動の合成データ生成パイプライン。
 テーブル定義書 / サンプルデータ / データ仕様メモ / 制約条件を入力として、再現可能な Python 生成器と評価レポートを出力する。
 
-## 実行フロー
+## アーキテクチャ
+
+ユーザーは **input/ を整備** して **PM エージェント** を起動するだけ。
+PM エージェントが各 SKILL を参照しながら **サブエージェント** を順次起動し、合成データと評価レポートまで一気通貫で生成する。
 
 ```mermaid
 flowchart TD
-    IN["input/<br/>table_definition, sample_data,<br/>data_spec.md, constraints.md"]
-    S0(["SKILL: 0_spec_ingest"])
-    W1["work/inferred_schema.json<br/>work/constraint_plan.md"]
-    S1(["SKILL: 1_generation_plan"])
-    W2["work/generation_plan.md"]
-    S2(["SKILL: 2_generator_impl"])
-    O1["src/generator.py<br/>output/synthetic_data.csv"]
-    S3(["SKILL: 3_evaluate_and_refine"])
-    O2["src/evaluate.py<br/>output/evaluation_report.md<br/>output/constraints_check.csv"]
+    USER([👤 ユーザー])
+    INPUT[("📁 input/<br/>table_definition · sample_data<br/>data_spec.md · constraints.md")]
+    PM[["🧭 PMエージェント<br/>(/synthesize)"]]
 
-    IN --> S0 --> W1 --> S1 --> W2 --> S2 --> O1 --> S3 --> O2
+    SA0[["🤖 sub-agent<br/>0_spec_ingest"]]
+    SA1[["🤖 sub-agent<br/>1_generation_plan"]]
+    SA2[["🤖 sub-agent<br/>2_generator_impl"]]
+    SA3[["🤖 sub-agent<br/>3_evaluate_and_refine"]]
+
+    SKILLS[/"📚 .claude/skills/<br/>各 SKILL.md"/]
+
+    OUT[("📁 work/ · src/ · output/<br/>schema · plan · generator.py<br/>synthetic_data · 評価レポート")]
+
+    USER -- "①input/ を用意" --> INPUT
+    USER == "②/synthesize 起動" ==> PM
+    INPUT --> PM
+
+    PM -- "順次委譲" --> SA0
+    SA0 --> SA1
+    SA1 --> SA2
+    SA2 --> SA3
+
+    SKILLS -. 参照 .-> SA0
+    SKILLS -. 参照 .-> SA1
+    SKILLS -. 参照 .-> SA2
+    SKILLS -. 参照 .-> SA3
+
+    SA3 --> OUT
+    OUT == "③成果物確認" ==> USER
 ```
+
+各サブエージェントは自分の SKILL.md（`.claude/skills/<step>/SKILL.md`）に従って動き、成果物をファイルに書き出して PM に完了報告する。PM は次ステップに進む前に各 SKILL の Acceptance Criteria を確認する。
 
 ## 思想
 
-- 共通の **SKILL（パイプライン仕様）** は `docs/spec.md` で定義する。
-- データ生成は **タスク単位** で独立。タスクごとに `input/`, `work/`, `src/`, `output/` を持つ。
-- SKILL の順序 (`0_spec_ingest` → `1_generation_plan` → `2_generator_impl` → `3_evaluate_and_refine`) はどのタスクでも変わらない。
-- 列名・テーブル名・制約はタスク固有。それぞれのタスクの `input/` 配下にすべて記述する。
+- ユーザーの責務は **input/ の用意** と **PM エージェントへの指示** のみ。
+- PM エージェント (`/synthesize`) はワークフローを知っているが、実作業はしない。各ステップを **サブエージェント** に委譲する。
+- 各サブエージェントは `.claude/skills/<step>/SKILL.md` に書かれた **タスク非依存の SKILL** を参照して動く。
+- 列名・テーブル名・制約・サンプルなど **タスク固有の情報** は `examples/<task_name>/input/` 配下にすべて閉じ込める。
+- データ生成はタスク単位で独立。タスクごとに `input/`, `work/`, `src/`, `output/` を持つ。
 
 ## ディレクトリ構成
 
@@ -68,7 +92,7 @@ mockdata-generator/
 - `data_spec.md`
 - `constraints.md`
 
-### 2. エージェントに一発実行を依頼する
+### 2. PM エージェントに一発実行を依頼する
 
 Claude Code で次のスラッシュコマンドを実行するだけ。
 
@@ -76,7 +100,7 @@ Claude Code で次のスラッシュコマンドを実行するだけ。
 /synthesize examples/<task_name>
 ```
 
-エージェントが内部で `0_spec_ingest → 1_generation_plan → 2_generator_impl → 3_evaluate_and_refine` を順次回し、`work/`・`src/`・`output/` 配下に成果物を生成する。各ステップの進捗とAcceptance Criteria 充足状況は逐次レポートされる。
+PM エージェントが起動し、`0_spec_ingest → 1_generation_plan → 2_generator_impl → 3_evaluate_and_refine` の各ステップを **サブエージェント** に順次委譲する。各サブエージェントは対応する SKILL.md を参照してタスクを進め、成果物をファイルに書き出す。PM は完了報告と Acceptance Criteria の充足を確認したうえで次ステップに進み、最終的に `work/`・`src/`・`output/` 配下の生成物と評価サマリをユーザーに返す。
 
 ### 3. （任意）ステップ毎に確認したい場合
 
