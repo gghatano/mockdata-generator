@@ -5,43 +5,47 @@
 
 ## アーキテクチャ
 
-ユーザーは **input/ を整備** して **PM エージェント** を起動するだけ。
-PM エージェントが各 SKILL を参照しながら **サブエージェント** を順次起動し、合成データと評価レポートまで一気通貫で生成する。
+**人間がやること**（左）と **エージェントがやること**（右）を 2 つの枠で分けて整理する。
+人間側はメタデータ整備 → 依頼 → 結果確認のループ。エージェント側では PM エージェントが SKILL.md 群を参照しつつ、4 体のサブエージェントを順次起動する。
 
 ```mermaid
-flowchart TD
-    USER([👤 ユーザー])
-    INPUT[("📁 input/<br/>table_definition · sample_data<br/>data_spec.md · constraints.md")]
-    PM[["🧭 PMエージェント<br/>(/synthesize)"]]
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart LR
+    subgraph HUMAN["👤 人間がやること（起点）"]
+        direction TB
+        H1["① メタデータ・仕様作成<br/>input/ を整備"]
+        H2["② データ生成依頼<br/>/synthesize 起動"]
+        H3["③ 結果の確認・<br/>フィードバック"]
+        H1 --> H2 --> H3
+        H3 -. 修正・追加 .-> H1
+    end
 
-    SA0[["🤖 sub-agent<br/>0_spec_ingest"]]
-    SA1[["🤖 sub-agent<br/>1_generation_plan"]]
-    SA2[["🤖 sub-agent<br/>2_generator_impl"]]
-    SA3[["🤖 sub-agent<br/>3_evaluate_and_refine"]]
+    subgraph AGENT["🤖 AI エージェントがやること"]
+        direction TB
+        SKILLS[/"📚 .claude/skills/<br/>各 SKILL.md"/]
+        PM[["🧭 PMエージェント<br/>(/synthesize)"]]
+        SA0["sub: 0_spec_ingest"]
+        SA1["sub: 1_generation_plan"]
+        SA2["sub: 2_generator_impl"]
+        SA3["sub: 3_evaluate_and_refine"]
+        OUT[("💾 work · src · output<br/>schema / plan / generator.py<br/>synthetic_data / 評価レポート")]
 
-    SKILLS[/"📚 .claude/skills/<br/>各 SKILL.md"/]
+        SKILLS -. 参照 .-> PM
+        PM == 指示 ==> SA0
+        PM == 指示 ==> SA1
+        PM == 指示 ==> SA2
+        PM == 指示 ==> SA3
+        SA0 --> OUT
+        SA1 --> OUT
+        SA2 --> OUT
+        SA3 --> OUT
+    end
 
-    OUT[("📁 work/ · src/ · output/<br/>schema · plan · generator.py<br/>synthetic_data · 評価レポート")]
-
-    USER -- "①input/ を用意" --> INPUT
-    USER == "②/synthesize 起動" ==> PM
-    INPUT --> PM
-
-    PM -- "順次委譲" --> SA0
-    SA0 --> SA1
-    SA1 --> SA2
-    SA2 --> SA3
-
-    SKILLS -. 参照 .-> SA0
-    SKILLS -. 参照 .-> SA1
-    SKILLS -. 参照 .-> SA2
-    SKILLS -. 参照 .-> SA3
-
-    SA3 --> OUT
-    OUT == "③成果物確認" ==> USER
+    H2 ==>|依頼| PM
+    OUT ==>|結果| H3
 ```
 
-各サブエージェントは自分の SKILL.md（`.claude/skills/<step>/SKILL.md`）に従って動き、成果物をファイルに書き出して PM に完了報告する。PM は次ステップに進む前に各 SKILL の Acceptance Criteria を確認する。
+人間側はメタデータと依頼を出すループに集中し、生成・評価の実作業はすべてエージェント側に閉じる。PM はコードを書かず、各ステップをサブエージェントに委譲し、Acceptance Criteria を満たしたかだけを確認する。
 
 ## 思想
 
