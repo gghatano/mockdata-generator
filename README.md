@@ -57,48 +57,51 @@ mockdata-generator/
         ├── input/  work/  src/  output/
 ```
 
-## ワークフロー（新しいタスクを追加するとき）
+## 使い方
 
-1. `examples/<task_name>/input/` を作り、以下を配置する。
-   - `table_definition.csv`（または `.xlsx`）
-   - `sample_data.csv`（テーブルが複数なら複数ファイル可）
-   - `data_spec.md`
-   - `constraints.md`
-2. `SKILL 0_spec_ingest` に従い、`work/inferred_schema.json` と `work/constraint_plan.md` を作成する。
-3. `SKILL 1_generation_plan` に従い、`work/generation_plan.md` を作成する。
-4. `SKILL 2_generator_impl` に従い、`src/generator.py` を実装する。
-5. `SKILL 3_evaluate_and_refine` に従い、`src/evaluate.py` を実装し、評価レポートを生成する。
-6. 必要に応じて、評価結果を踏まえて `generator.py` を修正する。
+### 1. 入力ファイルを整備する
 
-各 SKILL の詳細・入力・出力・Acceptance Criteria は `docs/spec.md` および `.claude/skills/<skill_name>/SKILL.md` を参照。
+`examples/<task_name>/input/` を作り、以下を配置する。
 
-## SKILL の呼び出し（Claude Code）
+- `*table_definition.csv`（または `.xlsx`）
+- `*sample_data.csv`（テーブルが複数なら複数ファイル可）
+- `data_spec.md`
+- `constraints.md`
 
-各ステップは Claude Code の SKILL として `.claude/skills/` に登録されている。タスクのルートディレクトリを `$ARGUMENTS` として渡す。
+### 2. エージェントに一発実行を依頼する
+
+Claude Code で次のスラッシュコマンドを実行するだけ。
 
 ```
-/0_spec_ingest         examples/university_enrollment
-/1_generation_plan     examples/university_enrollment
-/2_generator_impl      examples/university_enrollment
-/3_evaluate_and_refine examples/university_enrollment
+/synthesize examples/<task_name>
+```
+
+エージェントが内部で `0_spec_ingest → 1_generation_plan → 2_generator_impl → 3_evaluate_and_refine` を順次回し、`work/`・`src/`・`output/` 配下に成果物を生成する。各ステップの進捗とAcceptance Criteria 充足状況は逐次レポートされる。
+
+### 3. （任意）ステップ毎に確認したい場合
+
+各 SKILL を個別に呼ぶこともできる。
+
+```
+/0_spec_ingest         examples/<task_name>
+/1_generation_plan     examples/<task_name>
+/2_generator_impl      examples/<task_name>
+/3_evaluate_and_refine examples/<task_name>
 ```
 
 スラッシュコマンドのほか、Claude が自動マッチで起動することもある（各 SKILL.md の `description` を参照）。
+各 SKILL の詳細・入力・出力・Acceptance Criteria は `docs/spec.md` および `.claude/skills/<skill_name>/SKILL.md` を参照。
 
-## 実行例
+## 生成済みコードの直接実行
 
-各タスクは独立して実行できる。コマンドはタスクのルート（プロジェクトルート）から実行する想定。
-
-### タスク1（顧客マスタ単体）
+`/synthesize` でいったん `generator.py` / `evaluate.py` が出来上がった後は、件数や seed を変えて Python 側だけで再実行できる。
 
 ```bash
+# タスク1（顧客マスタ単体）
 uv run python examples/customer/src/generator.py --rows 10000 --seed 42
 uv run python examples/customer/src/evaluate.py
-```
 
-### タスク2（顧客マスタ × 取引履歴）
-
-```bash
+# タスク2（顧客 × 取引）
 uv run python examples/customer_transactions/src/generator.py --customers 1000 --seed 42
 uv run python examples/customer_transactions/src/evaluate.py
 ```
