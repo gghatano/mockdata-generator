@@ -3,6 +3,23 @@
 仕様駆動の合成データ生成パイプライン。
 テーブル定義書 / サンプルデータ / データ仕様メモ / 制約条件を入力として、再現可能な Python 生成器と評価レポートを出力する。
 
+## 実行フロー
+
+```mermaid
+flowchart TD
+    IN["input/<br/>table_definition, sample_data,<br/>data_spec.md, constraints.md"]
+    S0(["SKILL: 0_spec_ingest"])
+    W1["work/inferred_schema.json<br/>work/constraint_plan.md"]
+    S1(["SKILL: 1_generation_plan"])
+    W2["work/generation_plan.md"]
+    S2(["SKILL: 2_generator_impl"])
+    O1["src/generator.py<br/>output/synthetic_data.csv"]
+    S3(["SKILL: 3_evaluate_and_refine"])
+    O2["src/evaluate.py<br/>output/evaluation_report.md<br/>output/constraints_check.csv"]
+
+    IN --> S0 --> W1 --> S1 --> W2 --> S2 --> O1 --> S3 --> O2
+```
+
 ## 思想
 
 - 共通の **SKILL（パイプライン仕様）** は `docs/spec.md` で定義する。
