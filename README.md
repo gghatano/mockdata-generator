@@ -9,9 +9,10 @@
 人間側はメタデータ整備 → 依頼 → 結果確認のループ。エージェント側では PM エージェントが SKILL.md 群を参照しつつ、4 体のサブエージェントを順次起動する。
 
 ```mermaid
-flowchart TB
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart LR
     subgraph HUMAN["👤 人間がやること（起点）"]
-        direction LR
+        direction TB
         H1["① メタデータ・仕様作成<br/>input/ を整備"]
         H2["② データ生成依頼<br/>/synthesize 起動"]
         H3["③ 結果の確認・<br/>フィードバック"]
@@ -20,7 +21,7 @@ flowchart TB
     end
 
     subgraph AGENT["🤖 AI エージェントがやること"]
-        direction LR
+        direction TB
         SKILLS[/"📚 .claude/skills/<br/>各 SKILL.md"/]
         PM[["🧭 PMエージェント<br/>(/synthesize)"]]
         SA0["sub: 0_spec_ingest"]
