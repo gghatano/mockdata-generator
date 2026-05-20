@@ -1,0 +1,9 @@
+column_name,logical_name,data_type,nullable,description,allowed_values,min_value,max_value,format,primary_key,foreign_key
+transaction_id,取引ID,string,false,取引一意ID,,,,T\d{10},true,
+member_id,会員ID,string,false,取引を行った会員のID,,,,M\d{7},false,customer.member_id
+transaction_date,取引日,date,false,取引が発生した日,,2010-01-01,2026-05-20,YYYY-MM-DD,false,
+store_code,店舗コード,string,false,取引店舗,,,,S\d{3},false,
+product_category,商品カテゴリ,string,false,主要商品カテゴリ,"FOOD,DAILY,APPAREL,HOME,BOOKS,ELECTRONICS",,,,false,
+quantity,数量,int,false,合計購入点数,,1,30,,false,
+amount,取引金額,int,false,取引合計金額（円。税込）,,1,500000,,false,
+payment_method,支払方法,string,false,支払手段,"CASH,CREDIT,DEBIT,EMONEY,POINT",,,,false,

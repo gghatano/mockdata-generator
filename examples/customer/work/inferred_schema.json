@@ -1,0 +1,173 @@
+{
+  "table_name": "customer_master",
+  "row_count_in_sample": 40,
+  "columns": [
+    {
+      "column_name": "member_id",
+      "logical_name": "会員ID",
+      "data_type": "string",
+      "nullable": false,
+      "primary_key": true,
+      "format": "M\\d{7}",
+      "description": "会員一意ID。M+7桁ゼロ埋め連番。",
+      "sample_stats": {
+        "unique": 40,
+        "null_rate": 0.0
+      },
+      "source": "explicit"
+    },
+    {
+      "column_name": "gender",
+      "logical_name": "性別コード",
+      "data_type": "int",
+      "nullable": false,
+      "allowed_values": [1, 2, 9],
+      "description": "1=男性 2=女性 9=不明",
+      "sample_stats": {
+        "frequency": {"1": 18, "2": 19, "9": 3},
+        "null_rate": 0.0
+      },
+      "source": "explicit"
+    },
+    {
+      "column_name": "age",
+      "logical_name": "年齢",
+      "data_type": "int",
+      "nullable": false,
+      "min_value": 0,
+      "max_value": 110,
+      "description": "会員の年齢",
+      "sample_stats": {
+        "min": 16,
+        "max": 73,
+        "mean": 40.4,
+        "std": 16.2,
+        "p25": 27.75,
+        "p50": 38.5,
+        "p75": 52.25,
+        "null_rate": 0.0
+      },
+      "source": "explicit+inferred",
+      "assumption": "会員は概ね15〜85歳に集中するため、切断正規分布で生成する想定。"
+    },
+    {
+      "column_name": "prefecture_code",
+      "logical_name": "都道府県コード",
+      "data_type": "string",
+      "nullable": false,
+      "format": "\\d{2}",
+      "allowed_values_range": ["01", "47"],
+      "description": "JIS X 0401 都道府県コード",
+      "sample_stats": {
+        "top_values": {
+          "13": 10, "27": 6, "14": 5, "40": 5, "11": 4,
+          "23": 4, "28": 3, "01": 2, "12": 1
+        },
+        "null_rate": 0.0
+      },
+      "source": "explicit+inferred"
+    },
+    {
+      "column_name": "join_date",
+      "logical_name": "入会日",
+      "data_type": "date",
+      "nullable": false,
+      "format": "YYYY-MM-DD",
+      "min_value": "2010-01-01",
+      "max_value": "2025-12-31",
+      "description": "会員登録日",
+      "sample_stats": {
+        "min": "2010-08-05",
+        "max": "2025-05-14",
+        "null_rate": 0.0
+      },
+      "source": "explicit"
+    },
+    {
+      "column_name": "leave_date",
+      "logical_name": "退会日",
+      "data_type": "date",
+      "nullable": true,
+      "format": "YYYY-MM-DD",
+      "min_value": "2010-01-01",
+      "max_value": "2025-12-31",
+      "description": "退会日。在籍中はnull。",
+      "sample_stats": {
+        "non_null_rate": 0.125,
+        "null_rate": 0.875
+      },
+      "source": "explicit+inferred",
+      "assumption": "data_specには『約15%に退会日が設定』と記載があり、サンプル(12.5%)と概ね整合する。生成では15%を採用。"
+    },
+    {
+      "column_name": "member_rank",
+      "logical_name": "会員ランク",
+      "data_type": "string",
+      "nullable": false,
+      "allowed_values": ["BRONZE", "SILVER", "GOLD", "PLATINUM"],
+      "description": "会員ランク",
+      "sample_stats": {
+        "frequency": {"BRONZE": 13, "SILVER": 10, "GOLD": 10, "PLATINUM": 7}
+      },
+      "source": "explicit",
+      "assumption": "data_specに記載のBRONZE:SILVER:GOLD:PLATINUM=45:30:18:7を採用する（サンプルは件数が少なく信頼区間が広いため）。"
+    },
+    {
+      "column_name": "annual_spend",
+      "logical_name": "年間購入額",
+      "data_type": "int",
+      "nullable": false,
+      "min_value": 0,
+      "max_value": 3000000,
+      "description": "直近1年の購入合計（円）",
+      "sample_stats": {
+        "min": 9000,
+        "max": 1240000,
+        "mean": 331600,
+        "std": 312328
+      },
+      "source": "explicit+inferred",
+      "assumption": "member_rankごとに対数正規寄りの分布を生成し、年齢に対しても弱い正の相関を付ける。"
+    },
+    {
+      "column_name": "has_spouse",
+      "logical_name": "配偶者有無",
+      "data_type": "int",
+      "nullable": false,
+      "allowed_values": [0, 1],
+      "description": "0=なし 1=あり",
+      "sample_stats": {
+        "frequency": {"0": 14, "1": 26}
+      },
+      "source": "explicit"
+    },
+    {
+      "column_name": "email_optin",
+      "logical_name": "メール許諾",
+      "data_type": "int",
+      "nullable": false,
+      "allowed_values": [0, 1],
+      "description": "0=不可 1=可。約70%が1。",
+      "sample_stats": {
+        "frequency": {"0": 13, "1": 27}
+      },
+      "source": "explicit"
+    },
+    {
+      "column_name": "registration_channel",
+      "logical_name": "登録チャネル",
+      "data_type": "string",
+      "nullable": false,
+      "allowed_values": ["WEB", "STORE", "APP", "PHONE"],
+      "description": "登録経路",
+      "sample_stats": {
+        "frequency": {"WEB": 14, "APP": 13, "STORE": 9, "PHONE": 4}
+      },
+      "source": "explicit"
+    }
+  ],
+  "notes": [
+    "サンプルデータは40件と少ないため、構成比はdata_spec.mdの指定を優先する。",
+    "個人情報を含む実値ではなく、仕様に基づく合成データである。"
+  ]
+}

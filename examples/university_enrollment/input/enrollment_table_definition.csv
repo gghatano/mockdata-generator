@@ -1,0 +1,7 @@
+column_name,logical_name,data_type,nullable,description,allowed_values,min_value,max_value,format,primary_key,foreign_key
+enrollment_id,履修ID,string,false,履修登録の一意ID,,,,E\d{10},true,
+student_id,学籍番号,string,false,履修する学生,,,,S\d{8},false,student.student_id
+course_code,講義コード,string,false,履修対象の講義,,,,C\d{4},false,course.course_code
+academic_year,履修年度,int,false,履修した西暦年度,,2018,2025,,false,
+final_grade,成績,string,true,成績評価。W=履修取消で点数なし,"S,A,B,C,D,F,W",,,,false,
+attendance_rate,出席率,float,false,出席率（%）,,0.0,100.0,,false,

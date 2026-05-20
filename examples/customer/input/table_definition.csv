@@ -1,0 +1,12 @@
+column_name,logical_name,data_type,nullable,description,allowed_values,min_value,max_value,format,primary_key,foreign_key
+member_id,会員ID,string,false,会員一意ID,,,,M\d{7},true,
+gender,性別コード,int,false,1=男性 2=女性 9=不明,"1,2,9",,,,false,
+age,年齢,int,false,会員の年齢,,0,110,,false,
+prefecture_code,都道府県コード,string,false,JIS X 0401 都道府県コード,,,,\d{2},false,
+join_date,入会日,date,false,会員登録日,,2010-01-01,2025-12-31,YYYY-MM-DD,false,
+leave_date,退会日,date,true,退会日（在籍中はnull）,,2010-01-01,2025-12-31,YYYY-MM-DD,false,
+member_rank,会員ランク,string,false,会員ランク,"BRONZE,SILVER,GOLD,PLATINUM",,,,false,
+annual_spend,年間購入額,int,false,直近1年の購入合計（円）,,0,3000000,,false,
+has_spouse,配偶者有無,int,false,0=なし 1=あり,"0,1",,,,false,
+email_optin,メール許諾,int,false,0=不可 1=可,"0,1",,,,false,
+registration_channel,登録チャネル,string,false,登録経路,"WEB,STORE,APP,PHONE",,,,false,

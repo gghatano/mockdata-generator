@@ -1,0 +1,11 @@
+constraint_id,constraint,violations,total,violation_rate,sample_violation
+C1,member_id 一意性,0,5000,0.0,
+C2,leave_date >= join_date,0,754,0.0,
+C3,age<18 → has_spouse=0,0,451,0.0,
+C4,PLATINUM → annual_spend >= 500_000,0,346,0.0,
+C5a,"age ∈ [0,110]",0,5000,0.0,
+C5b,"annual_spend ∈ [0,3000000]",0,5000,0.0,
+C6a,"gender ∈ {1,2,9}",0,5000,0.0,
+C6b,"member_rank ∈ {BRONZE,SILVER,GOLD,PLATINUM}",0,5000,0.0,
+C6c,"registration_channel ∈ {WEB,STORE,APP,PHONE}",0,5000,0.0,
+C6d,prefecture_code ∈ 01..47,0,5000,0.0,

@@ -1,0 +1,7 @@
+column_name,logical_name,data_type,nullable,description,allowed_values,min_value,max_value,format,primary_key,foreign_key
+course_code,講義コード,string,false,講義の一意コード,,,,C\d{4},true,
+department,開講学部,string,false,講義を開講する学部,"LITERATURE,SCIENCE,ENGINEERING,ECONOMICS,MEDICAL,COMMON",,,,false,
+credits,単位数,int,false,単位数,,1,4,,false,
+semester,開講学期,string,false,前期/後期/通年,"SPRING,FALL,FULL_YEAR",,,,false,
+level,対象学年レベル,int,false,主たる対象学年,,1,4,,false,
+max_students,定員,int,false,履修可能な最大人数,,20,300,,false,

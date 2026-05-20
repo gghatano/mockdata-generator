@@ -1,0 +1,51 @@
+{
+  "reference_date": "2026-05-20",
+  "tables": {
+    "customer": {
+      "primary_key": "member_id",
+      "columns": [
+        {"column_name": "member_id", "data_type": "string", "format": "M\\d{7}", "primary_key": true, "source": "explicit"},
+        {"column_name": "gender", "data_type": "int", "allowed_values": [1, 2, 9]},
+        {"column_name": "age", "data_type": "int", "min_value": 0, "max_value": 110},
+        {"column_name": "prefecture_code", "data_type": "string", "format": "\\d{2}"},
+        {"column_name": "join_date", "data_type": "date", "min_value": "2010-01-01", "max_value": "2025-12-31"},
+        {"column_name": "leave_date", "data_type": "date", "nullable": true, "min_value": "2010-01-01", "max_value": "2025-12-31"},
+        {"column_name": "member_rank", "data_type": "string", "allowed_values": ["BRONZE", "SILVER", "GOLD", "PLATINUM"]},
+        {"column_name": "annual_spend", "data_type": "int", "min_value": 0, "max_value": 3000000, "description": "直近1年の購入合計（基準日から遡る1年）"},
+        {"column_name": "has_spouse", "data_type": "int", "allowed_values": [0, 1]},
+        {"column_name": "email_optin", "data_type": "int", "allowed_values": [0, 1]},
+        {"column_name": "registration_channel", "data_type": "string", "allowed_values": ["WEB", "STORE", "APP", "PHONE"]}
+      ]
+    },
+    "transaction": {
+      "primary_key": "transaction_id",
+      "foreign_keys": [
+        {"column": "member_id", "references": "customer.member_id"}
+      ],
+      "columns": [
+        {"column_name": "transaction_id", "data_type": "string", "format": "T\\d{10}", "primary_key": true},
+        {"column_name": "member_id", "data_type": "string", "foreign_key": "customer.member_id"},
+        {"column_name": "transaction_date", "data_type": "date", "min_value": "2010-01-01", "max_value": "2026-05-20"},
+        {"column_name": "store_code", "data_type": "string", "format": "S\\d{3}", "domain": "S001..S050"},
+        {"column_name": "product_category", "data_type": "string", "allowed_values": ["FOOD", "DAILY", "APPAREL", "HOME", "BOOKS", "ELECTRONICS"]},
+        {"column_name": "quantity", "data_type": "int", "min_value": 1, "max_value": 30},
+        {"column_name": "amount", "data_type": "int", "min_value": 1, "max_value": 500000},
+        {"column_name": "payment_method", "data_type": "string", "allowed_values": ["CASH", "CREDIT", "DEBIT", "EMONEY", "POINT"]}
+      ]
+    }
+  },
+  "relationships": [
+    {
+      "name": "transactions_belong_to_customer",
+      "type": "many_to_one",
+      "from": "transaction.member_id",
+      "to": "customer.member_id",
+      "rules": [
+        "transaction.transaction_date >= customer.join_date",
+        "customer.leave_date is null OR transaction.transaction_date <= customer.leave_date",
+        "transaction.transaction_date <= reference_date",
+        "1会員の直近1年の amount 合計 ≒ customer.annual_spend (±25%)"
+      ]
+    }
+  ]
+}

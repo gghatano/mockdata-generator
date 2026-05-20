@@ -1,0 +1,8 @@
+column_name,logical_name,data_type,nullable,description,allowed_values,min_value,max_value,format,primary_key,foreign_key
+student_id,学籍番号,string,false,学生の一意ID,,,,S\d{8},true,
+enrollment_year,入学年度,int,false,入学した西暦年度,,2018,2025,,false,
+department,所属学部,string,false,学部,"LITERATURE,SCIENCE,ENGINEERING,ECONOMICS,MEDICAL",,,,false,
+grade,学年,int,false,現在の学年。MEDICAL は最大6 それ以外は最大4,,1,6,,false,
+gender,性別コード,int,false,1=男性 2=女性 9=不明,"1,2,9",,,,false,
+status,在籍状況,string,false,在籍状況,"ENROLLED,LEAVE,GRADUATED,WITHDRAWN",,,,false,
+gpa,通算GPA,float,false,0.0〜4.0,,0.0,4.0,,false,
