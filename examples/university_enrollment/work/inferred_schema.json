@@ -1,0 +1,382 @@
+{
+  "reference_year": 2025,
+  "notes": [
+    "サンプル件数は student=22, course=20, enrollment=36 と少ないため、構成比は data_spec.md の指定を優先する。",
+    "個人を特定する氏名・住所等は含まれない設計。",
+    "学生×講義×年度の一意性、FK整合、在学期間内、定員等は constraint_plan.md の分類に従って実装する。"
+  ],
+  "tables": {
+    "student": {
+      "primary_key": "student_id",
+      "row_count_in_sample": 22,
+      "columns": [
+        {
+          "column_name": "student_id",
+          "logical_name": "学籍番号",
+          "data_type": "string",
+          "nullable": false,
+          "primary_key": true,
+          "format": "S\\d{8}",
+          "description": "学生の一意ID。先頭4桁は入学年度に一致する。",
+          "sample_stats": {
+            "unique": 22,
+            "null_rate": 0.0,
+            "example": "S20230007"
+          },
+          "source": "explicit"
+        },
+        {
+          "column_name": "enrollment_year",
+          "logical_name": "入学年度",
+          "data_type": "int",
+          "nullable": false,
+          "min_value": 2018,
+          "max_value": 2025,
+          "description": "入学した西暦年度",
+          "sample_stats": {
+            "min": 2018,
+            "max": 2025,
+            "mean": 2021.77,
+            "std": 2.25,
+            "frequency": {"2018": 2, "2019": 2, "2020": 3, "2021": 3, "2022": 3, "2023": 3, "2024": 3, "2025": 3},
+            "null_rate": 0.0
+          },
+          "source": "explicit",
+          "assumption": "入学年度の構成は概ね均等（2018〜2025）。data_spec.md の指定通り。"
+        },
+        {
+          "column_name": "department",
+          "logical_name": "所属学部",
+          "data_type": "string",
+          "nullable": false,
+          "allowed_values": ["LITERATURE", "SCIENCE", "ENGINEERING", "ECONOMICS", "MEDICAL"],
+          "description": "学部",
+          "sample_stats": {
+            "frequency": {"ENGINEERING": 6, "LITERATURE": 4, "SCIENCE": 4, "ECONOMICS": 4, "MEDICAL": 4},
+            "null_rate": 0.0
+          },
+          "source": "explicit",
+          "assumption": "data_spec.md の構成比 ENGINEERING:LITERATURE:SCIENCE:ECONOMICS:MEDICAL = 30:20:18:22:10 を採用（サンプル件数が少ないため）。"
+        },
+        {
+          "column_name": "grade",
+          "logical_name": "学年",
+          "data_type": "int",
+          "nullable": false,
+          "min_value": 1,
+          "max_value": 6,
+          "description": "現在の学年。MEDICAL は最大6、それ以外は最大4。",
+          "sample_stats": {
+            "min": 1,
+            "max": 6,
+            "mean": 2.95,
+            "frequency": {"1": 6, "2": 2, "3": 4, "4": 8, "5": 1, "6": 1},
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "通常: grade = min(reference_year - enrollment_year + 1, 学部の修業年限)。MEDICAL=6 / その他=4。本仕様では休学・留年は除外し、理論値で算出する。"
+        },
+        {
+          "column_name": "gender",
+          "logical_name": "性別コード",
+          "data_type": "int",
+          "nullable": false,
+          "allowed_values": [1, 2, 9],
+          "description": "1=男性 2=女性 9=不明",
+          "sample_stats": {
+            "frequency": {"1": 10, "2": 10, "9": 2},
+            "null_rate": 0.0
+          },
+          "source": "explicit",
+          "assumption": "data_spec.md の構成比 50:48:2 を採用。MEDICAL のみ女性比率がやや高い設定とする。"
+        },
+        {
+          "column_name": "status",
+          "logical_name": "在籍状況",
+          "data_type": "string",
+          "nullable": false,
+          "allowed_values": ["ENROLLED", "LEAVE", "GRADUATED", "WITHDRAWN"],
+          "description": "在籍状況",
+          "sample_stats": {
+            "frequency": {"ENROLLED": 15, "GRADUATED": 5, "WITHDRAWN": 1, "LEAVE": 1},
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "経過年数で構成比を分岐: 4年経過（MEDICAL は 6年経過）以上 → GRADUATED 80% / WITHDRAWN 8% / LEAVE 2% / ENROLLED 10%。経過年数 < 修業年限 → ENROLLED 92% / LEAVE 5% / WITHDRAWN 3%。"
+        },
+        {
+          "column_name": "gpa",
+          "logical_name": "通算GPA",
+          "data_type": "float",
+          "nullable": false,
+          "min_value": 0.0,
+          "max_value": 4.0,
+          "description": "通算GPA。0.0〜4.0。",
+          "sample_stats": {
+            "min": 1.85,
+            "max": 3.90,
+            "mean": 3.165,
+            "std": 0.500,
+            "mean_by_department": {"ECONOMICS": 3.24, "ENGINEERING": 2.88, "LITERATURE": 2.69, "MEDICAL": 3.72, "SCIENCE": 3.43},
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "MEDICAL は平均約3.6、その他は平均約3.0。学部別の正規分布（truncated, [0.0,4.0]）で生成。"
+        }
+      ]
+    },
+    "course": {
+      "primary_key": "course_code",
+      "row_count_in_sample": 20,
+      "columns": [
+        {
+          "column_name": "course_code",
+          "logical_name": "講義コード",
+          "data_type": "string",
+          "nullable": false,
+          "primary_key": true,
+          "format": "C\\d{4}",
+          "description": "講義の一意コード。C+4桁。",
+          "sample_stats": {
+            "unique": 20,
+            "null_rate": 0.0,
+            "example": "C0001"
+          },
+          "source": "explicit"
+        },
+        {
+          "column_name": "department",
+          "logical_name": "開講学部",
+          "data_type": "string",
+          "nullable": false,
+          "allowed_values": ["LITERATURE", "SCIENCE", "ENGINEERING", "ECONOMICS", "MEDICAL", "COMMON"],
+          "description": "講義を開講する学部。COMMON は全学共通教養。",
+          "sample_stats": {
+            "frequency": {"ENGINEERING": 4, "MEDICAL": 4, "COMMON": 3, "LITERATURE": 3, "SCIENCE": 3, "ECONOMICS": 3},
+            "null_rate": 0.0
+          },
+          "source": "explicit",
+          "assumption": "data_spec.md の構成比 COMMON:ENGINEERING:ECONOMICS:LITERATURE:SCIENCE:MEDICAL = 25:20:15:15:13:12 を採用。"
+        },
+        {
+          "column_name": "credits",
+          "logical_name": "単位数",
+          "data_type": "int",
+          "nullable": false,
+          "min_value": 1,
+          "max_value": 4,
+          "description": "単位数。FULL_YEAR は通常4単位、SPRING/FALL は 2 単位中心。",
+          "sample_stats": {
+            "min": 1,
+            "max": 4,
+            "mean": 2.75,
+            "frequency": {"1": 1, "2": 9, "3": 4, "4": 6},
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "semester=FULL_YEAR → credits=3 or 4。SPRING/FALL → credits=1〜3（中心は 2）。"
+        },
+        {
+          "column_name": "semester",
+          "logical_name": "開講学期",
+          "data_type": "string",
+          "nullable": false,
+          "allowed_values": ["SPRING", "FALL", "FULL_YEAR"],
+          "description": "前期/後期/通年",
+          "sample_stats": {
+            "frequency": {"SPRING": 7, "FALL": 7, "FULL_YEAR": 6},
+            "null_rate": 0.0
+          },
+          "source": "explicit",
+          "assumption": "data_spec.md の構成比 SPRING:FALL:FULL_YEAR = 40:40:20。"
+        },
+        {
+          "column_name": "level",
+          "logical_name": "対象学年レベル",
+          "data_type": "int",
+          "nullable": false,
+          "min_value": 1,
+          "max_value": 4,
+          "description": "主たる対象学年。",
+          "sample_stats": {
+            "min": 1,
+            "max": 4,
+            "mean": 2.05,
+            "frequency": {"1": 8, "2": 5, "3": 5, "4": 2},
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "data_spec.md の構成比 1:2:3:4 = 30:30:25:15。"
+        },
+        {
+          "column_name": "max_students",
+          "logical_name": "定員",
+          "data_type": "int",
+          "nullable": false,
+          "min_value": 20,
+          "max_value": 300,
+          "description": "履修可能な最大人数。学部専門は 40〜150、共通教養は 100〜300、医学専門は 80〜120。",
+          "sample_stats": {
+            "min": 40,
+            "max": 200,
+            "mean": 107.0,
+            "std": 51.6,
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "department に応じた区分一様分布で生成: COMMON=[100,300], MEDICAL=[80,120], その他学部専門=[40,150]。"
+        }
+      ]
+    },
+    "enrollment": {
+      "primary_key": "enrollment_id",
+      "row_count_in_sample": 36,
+      "foreign_keys": [
+        {"column": "student_id", "references": "student.student_id"},
+        {"column": "course_code", "references": "course.course_code"}
+      ],
+      "columns": [
+        {
+          "column_name": "enrollment_id",
+          "logical_name": "履修ID",
+          "data_type": "string",
+          "nullable": false,
+          "primary_key": true,
+          "format": "E\\d{10}",
+          "description": "履修登録の一意ID。E+10桁。",
+          "sample_stats": {
+            "unique": 36,
+            "null_rate": 0.0,
+            "example": "E0000000001"
+          },
+          "source": "explicit"
+        },
+        {
+          "column_name": "student_id",
+          "logical_name": "学籍番号",
+          "data_type": "string",
+          "nullable": false,
+          "foreign_key": "student.student_id",
+          "format": "S\\d{8}",
+          "description": "履修する学生（student.student_id への FK）",
+          "sample_stats": {
+            "unique": 18,
+            "null_rate": 0.0
+          },
+          "source": "explicit"
+        },
+        {
+          "column_name": "course_code",
+          "logical_name": "講義コード",
+          "data_type": "string",
+          "nullable": false,
+          "foreign_key": "course.course_code",
+          "format": "C\\d{4}",
+          "description": "履修対象の講義（course.course_code への FK）",
+          "sample_stats": {
+            "unique": 15,
+            "null_rate": 0.0
+          },
+          "source": "explicit"
+        },
+        {
+          "column_name": "academic_year",
+          "logical_name": "履修年度",
+          "data_type": "int",
+          "nullable": false,
+          "min_value": 2018,
+          "max_value": 2025,
+          "description": "履修した西暦年度。学生の在学期間内。",
+          "sample_stats": {
+            "min": 2018,
+            "max": 2024,
+            "mean": 2021.33,
+            "std": 1.91,
+            "frequency": {"2018": 4, "2019": 4, "2020": 3, "2021": 6, "2022": 8, "2023": 6, "2024": 5},
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "academic_year は [student.enrollment_year, min(在籍最終年度, reference_year=2025)] の範囲。"
+        },
+        {
+          "column_name": "final_grade",
+          "logical_name": "成績",
+          "data_type": "string",
+          "nullable": true,
+          "allowed_values": ["S", "A", "B", "C", "D", "F", "W"],
+          "description": "成績評価。W=履修取消で点数なし。本データでは付与済みとする。",
+          "sample_stats": {
+            "frequency": {"A": 14, "S": 7, "B": 7, "C": 4, "F": 2, "W": 1, "D": 1},
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "出席率と相関付けて生成: >=90→S/A中心、>=80→A/B中心、60-80→B/C、40-60→C/D、<40→F or W。Wは出席率30以下中心、Sは出席率90以上中心。"
+        },
+        {
+          "column_name": "attendance_rate",
+          "logical_name": "出席率",
+          "data_type": "float",
+          "nullable": false,
+          "min_value": 0.0,
+          "max_value": 100.0,
+          "description": "出席率（%）。",
+          "sample_stats": {
+            "min": 18.0,
+            "max": 98.0,
+            "mean": 81.10,
+            "std": 17.91,
+            "null_rate": 0.0
+          },
+          "source": "explicit+inferred",
+          "assumption": "上方に偏った分布（mean≒80前後）を truncated normal で生成し、低出席率を一定割合混在させる。"
+        }
+      ]
+    }
+  },
+  "relationships": [
+    {
+      "name": "enrollment_belongs_to_student",
+      "type": "many_to_one",
+      "from": "enrollment.student_id",
+      "to": "student.student_id",
+      "rules": [
+        "enrollment.academic_year >= student.enrollment_year",
+        "student.status='GRADUATED' の場合、academic_year <= 卒業年度（=enrollment_year + 修業年限 - 1）",
+        "student.status='WITHDRAWN' の場合、在籍最終年度までで打ち切る",
+        "academic_year <= reference_year (2025)"
+      ]
+    },
+    {
+      "name": "enrollment_belongs_to_course",
+      "type": "many_to_one",
+      "from": "enrollment.course_code",
+      "to": "course.course_code",
+      "rules": [
+        "course.max_students を年間履修者数の概ねの上限とする（評価で違反率を確認）",
+        "履修時の学生学年と course.level の差が ±1 以内である比率を計測（EV4）",
+        "MEDICAL の学生は FULL_YEAR 比率が高い",
+        "学年 1〜2 は COMMON 中心、3〜4 は専門学部の講義が中心"
+      ]
+    },
+    {
+      "name": "unique_enrollment",
+      "type": "composite_unique",
+      "columns": ["enrollment.student_id", "enrollment.course_code", "enrollment.academic_year"],
+      "rules": [
+        "(student_id, course_code, academic_year) は一意。再履修は別年度で行う。"
+      ]
+    }
+  ],
+  "validation_findings": {
+    "fk_integrity_in_sample": {
+      "enrollment.student_id_in_student": true,
+      "enrollment.course_code_in_course": true
+    },
+    "uniqueness_in_sample": {
+      "student_id_unique": true,
+      "course_code_unique": true,
+      "enrollment_id_unique": true,
+      "(student_id,course_code,academic_year)_unique": true
+    }
+  }
+}
