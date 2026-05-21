@@ -1,155 +1,102 @@
 # mockdata-generator
 
-仕様駆動の合成データ生成パイプライン。
-テーブル定義書 / サンプルデータ / データ仕様メモ / 制約条件を入力として、再現可能な Python 生成器と評価レポートを出力する。
+仕様駆動で合成データを生成するためのエージェントワークフローです。
+テーブル定義書、サンプルデータ、データ仕様、制約条件を入力し、再実行可能な Python 生成器と評価レポートを出力します。
 
-## アーキテクチャ
+## Quickstart
 
-**人間がやること**（左）と **エージェントがやること**（右）を 2 つの枠で分けて整理する。
-人間側はメタデータ整備 → 依頼 → 結果確認のループ。エージェント側では PM エージェントが SKILL.md 群を参照しつつ、4 体のサブエージェントを順次起動する。
+### 1. 依存関係を準備する
 
-```mermaid
-%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
-flowchart LR
-    subgraph HUMAN["👤 人間がやること（起点）"]
-        direction TB
-        H1["① メタデータ・仕様作成<br/>input/ を整備"]
-        H2["② データ生成依頼<br/>/synthesize 起動"]
-        H3["③ 結果の確認・<br/>フィードバック"]
-        H1 --> H2 --> H3
-        H3 -. 修正・追加 .-> H1
-    end
-
-    subgraph AGENT["🤖 AI エージェントがやること"]
-        direction TB
-        SKILLS[/"📚 .claude/skills/<br/>各 SKILL.md"/]
-        PM[["🧭 PMエージェント<br/>(/synthesize)"]]
-        SA0["sub: 0_spec_ingest"]
-        SA1["sub: 1_generation_plan"]
-        SA2["sub: 2_generator_impl"]
-        SA3["sub: 3_evaluate_and_refine"]
-        OUT[("💾 work · src · output<br/>schema / plan / generator.py<br/>synthetic_data / 評価レポート")]
-
-        SKILLS -. 参照 .-> PM
-        PM == 指示 ==> SA0
-        PM == 指示 ==> SA1
-        PM == 指示 ==> SA2
-        PM == 指示 ==> SA3
-        SA0 --> OUT
-        SA1 --> OUT
-        SA2 --> OUT
-        SA3 --> OUT
-    end
-
-    H2 ==>|依頼| PM
-    OUT ==>|結果| H3
+```bash
+uv sync
 ```
 
-人間側はメタデータと依頼を出すループに集中し、生成・評価の実作業はすべてエージェント側に閉じる。PM はコードを書かず、各ステップをサブエージェントに委譲し、Acceptance Criteria を満たしたかだけを確認する。
+必要環境:
 
-## 思想
+- Python 3.14+
+- uv
 
-- ユーザーの責務は **input/ の用意** と **PM エージェントへの指示** のみ。
-- PM エージェント (`/synthesize`) はワークフローを知っているが、実作業はしない。各ステップを **サブエージェント** に委譲する。
-- 各サブエージェントは `.claude/skills/<step>/SKILL.md` に書かれた **タスク非依存の SKILL** を参照して動く。
-- 列名・テーブル名・制約・サンプルなど **タスク固有の情報** は `examples/<task_name>/input/` 配下にすべて閉じ込める。
-- データ生成はタスク単位で独立。タスクごとに `input/`, `work/`, `src/`, `output/` を持つ。
+### 2. 入力ファイルを配置する
 
-## ディレクトリ構成
+タスクごとに `examples/<task_name>/input/` を作成し、以下を配置します。
 
-```
-mockdata-generator/
-├── docs/
-│   └── spec.md                # SKILL定義（共通・タスク非依存）
-├── pyproject.toml             # uv 環境
-├── README.md                  # 本ドキュメント
-└── examples/
-    ├── customer/                       # タスク例1: 顧客マスタ単体
-    │   ├── input/
-    │   │   ├── table_definition.csv    # 列名・型・許容値などの仕様
-    │   │   ├── sample_data.csv         # 統計量推定用サンプル
-    │   │   ├── data_spec.md            # 業務ルールの自然言語仕様
-    │   │   └── constraints.md          # 必須/推奨制約
-    │   ├── work/                       # 中間成果物（0_spec_ingest / 1_generation_plan）
-    │   │   ├── inferred_schema.json
-    │   │   ├── constraint_plan.md
-    │   │   └── generation_plan.md
-    │   ├── src/                        # 2_generator_impl / 3_evaluate_and_refine
-    │   │   ├── generator.py
-    │   │   └── evaluate.py
-    │   └── output/                     # 最終成果物
-    │       ├── synthetic_data.csv
-    │       ├── evaluation_report.md
-    │       └── constraints_check.csv
-    └── customer_transactions/          # タスク例2: 顧客×取引（FK・在籍期間・年合計整合）
-        ├── input/  work/  src/  output/
+```text
+examples/<task_name>/input/
+├── *table_definition.csv   # 列名、型、許容値など
+├── *sample_data.csv        # 統計量・値域の参考サンプル
+├── data_spec.md            # 業務ルールや生成仕様
+└── constraints.md          # 必須/推奨制約
 ```
 
-## 使い方
+複数テーブルの場合は、テーブルごとに `*table_definition.csv` と `*sample_data.csv` を配置します。
 
-### 1. 入力ファイルを整備する
+### 3. 合成データを生成する
 
-`examples/<task_name>/input/` を作り、以下を配置する。
+Claude Code で次を実行します。
 
-- `*table_definition.csv`（または `.xlsx`）
-- `*sample_data.csv`（テーブルが複数なら複数ファイル可）
-- `data_spec.md`
-- `constraints.md`
-
-### 2. PM エージェントに一発実行を依頼する
-
-Claude Code で次のスラッシュコマンドを実行するだけ。
-
-```
+```text
 /synthesize examples/<task_name>
 ```
 
-PM エージェントが起動し、`0_spec_ingest → 1_generation_plan → 2_generator_impl → 3_evaluate_and_refine` の各ステップを **サブエージェント** に順次委譲する。各サブエージェントは対応する SKILL.md を参照してタスクを進め、成果物をファイルに書き出す。PM は完了報告と Acceptance Criteria の充足を確認したうえで次ステップに進み、最終的に `work/`・`src/`・`output/` 配下の生成物と評価サマリをユーザーに返す。
+例:
 
-### 3. （任意）ステップ毎に確認したい場合
-
-各 SKILL を個別に呼ぶこともできる。
-
+```text
+/synthesize examples/customer
 ```
+
+生成後は、主に以下のファイルを確認します。
+
+```text
+examples/<task_name>/
+├── work/
+│   ├── inferred_schema.json
+│   ├── constraint_plan.md
+│   └── generation_plan.md
+├── src/
+│   ├── generator.py
+│   └── evaluate.py
+└── output/
+    ├── synthetic_data.csv
+    ├── evaluation_report.md
+    └── constraints_check.csv
+```
+
+## 生成済みコードの再実行
+
+`/synthesize` で `generator.py` / `evaluate.py` が作成された後は、Python 側だけで再実行できます。
+
+```bash
+# 顧客マスタ単体
+uv run python examples/customer/src/generator.py --rows 10000 --seed 42
+uv run python examples/customer/src/evaluate.py
+
+# 顧客 x 取引
+uv run python examples/customer_transactions/src/generator.py --customers 1000 --seed 42
+uv run python examples/customer_transactions/src/evaluate.py
+```
+
+## ステップごとに実行する場合
+
+一括実行ではなく、各ステップを個別に確認しながら進めることもできます。
+
+```text
 /0_spec_ingest         examples/<task_name>
 /1_generation_plan     examples/<task_name>
 /2_generator_impl      examples/<task_name>
 /3_evaluate_and_refine examples/<task_name>
 ```
 
-スラッシュコマンドのほか、Claude が自動マッチで起動することもある（各 SKILL.md の `description` を参照）。
-各 SKILL の詳細・入力・出力・Acceptance Criteria は `docs/spec.md` および `.claude/skills/<skill_name>/SKILL.md` を参照。
+## 詳細ドキュメント
 
-## 生成済みコードの直接実行
+- [docs/spec.md](docs/spec.md): ワークフロー、設計方針、各ステップの詳細
+- [.claude/skills/synthesize/SKILL.md](.claude/skills/synthesize/SKILL.md): 一括実行の PM エージェント
+- [.claude/skills/0_spec_ingest/SKILL.md](.claude/skills/0_spec_ingest/SKILL.md): 仕様読み取り
+- [.claude/skills/1_generation_plan/SKILL.md](.claude/skills/1_generation_plan/SKILL.md): 生成方針設計
+- [.claude/skills/2_generator_impl/SKILL.md](.claude/skills/2_generator_impl/SKILL.md): 生成器実装
+- [.claude/skills/3_evaluate_and_refine/SKILL.md](.claude/skills/3_evaluate_and_refine/SKILL.md): 評価と改善
 
-`/synthesize` でいったん `generator.py` / `evaluate.py` が出来上がった後は、件数や seed を変えて Python 側だけで再実行できる。
+## 注意
 
-```bash
-# タスク1（顧客マスタ単体）
-uv run python examples/customer/src/generator.py --rows 10000 --seed 42
-uv run python examples/customer/src/evaluate.py
-
-# タスク2（顧客 × 取引）
-uv run python examples/customer_transactions/src/generator.py --customers 1000 --seed 42
-uv run python examples/customer_transactions/src/evaluate.py
-```
-
-タスク2 は親子関係（FK）・在籍期間内の取引日・直近1年の取引合計と annual_spend の整合といった、複数テーブルにまたがる制約のサンプル。`importlib` でタスク1 の generator/evaluate を再利用している（共通ロジックをタスク横断で使う一例）。
-
-## 依存
-
-- Python 3.13+
-- uv（パッケージ管理）
-- pandas, numpy, openpyxl, tabulate
-
-```bash
-uv sync
-```
-
-## 設計上の注意
-
-- 生成データは **仕様駆動の合成データ**であり、匿名加工情報ではない。
-- 実データの統計再現性は保証しない。PoC、画面モック、分析仮説検討用途を想定。
-- 生成は `numpy.random.default_rng(seed)` で固定し再現可能にする。
-- post sampling での除外件数は必ずログ出力する（`docs/spec.md` 参照）。
-- サンプルデータの行をそのまま含めない。
+- 生成データは仕様駆動の合成データであり、匿名加工情報ではありません。
+- 実データの統計再現性は保証しません。
+- PoC、画面モック、分析仮説検討用途を想定しています。
