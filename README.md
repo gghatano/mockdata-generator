@@ -88,7 +88,8 @@ uv run python examples/customer_transactions/src/evaluate.py
 
 ## 詳細ドキュメント
 
-- [docs/spec.md](docs/spec.md): ワークフロー、設計方針、各ステップの詳細
+- [docs/usage.md](docs/usage.md): 詳細な使い方、入力ファイル、実行手順、出力確認
+- [docs/spec.md](docs/spec.md): ワークフロー仕様、設計方針、Acceptance Criteria
 - [.claude/skills/synthesize/SKILL.md](.claude/skills/synthesize/SKILL.md): 一括実行の PM エージェント
 - [.claude/skills/0_spec_ingest/SKILL.md](.claude/skills/0_spec_ingest/SKILL.md): 仕様読み取り
 - [.claude/skills/1_generation_plan/SKILL.md](.claude/skills/1_generation_plan/SKILL.md): 生成方針設計
