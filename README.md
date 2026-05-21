@@ -58,8 +58,11 @@ examples/<task_name>/
 └── output/
     ├── synthetic_data.csv
     ├── evaluation_report.md
-    └── constraints_check.csv
+    ├── constraints_check.csv
+    └── quality_gate.json
 ```
+
+`/synthesize` は最後の品質チェック結果を確認し、必須制約違反や明示仕様との不整合があれば、生成器を修正して再生成・再評価する改善ループを回します。PM エージェントは `quality_gate.json` の `requires_refinement` を機械可読な判定として利用し、残る課題は `evaluation_report.md` に明記されます。
 
 ## 生成済みコードの再実行
 

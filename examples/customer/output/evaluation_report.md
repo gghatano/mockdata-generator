@@ -116,6 +116,13 @@
 - 必須制約 C1〜C6 の違反は **0件**。
 - C9 (rank × annual_spend の平均順序): OK
 
+## 品質ゲート
+- status: **pass**
+- requires_refinement: **false**
+- blocking_issues: 0
+- warnings: 0
+- 機械可読な判定は `quality_gate.json` を参照。
+
 ## 注意事項
 - 本データは仕様駆動の合成データであり、匿名加工情報ではない。
 - 実データの統計的再現性は保証しない。PoC・画面モック・分析仮説検討用途を想定。

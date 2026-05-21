@@ -86,6 +86,8 @@ Claude Code で以下を実行します。
 3_evaluate_and_refine
 ```
 
+最後の `3_evaluate_and_refine` で品質課題が見つかった場合、PM エージェントは `quality_gate.json`、評価レポート、制約チェック結果をもとに `2_generator_impl` へ戻り、生成器を修正してから再生成・再評価します。改善ループ後も残る課題は、追加仕様が必要な点または既知の限界として `evaluation_report.md` に記録します。
+
 ## 出力を確認する
 
 実行後、タスクディレクトリには以下の成果物が作成されます。
@@ -102,7 +104,8 @@ examples/<task_name>/
 └── output/
     ├── synthetic_data.csv
     ├── evaluation_report.md
-    └── constraints_check.csv
+    ├── constraints_check.csv
+    └── quality_gate.json
 ```
 
 主に確認するファイルは以下です。
@@ -112,6 +115,7 @@ examples/<task_name>/
 | `output/synthetic_data.csv` | 生成された合成データ |
 | `output/evaluation_report.md` | 評価結果のサマリ |
 | `output/constraints_check.csv` | 制約ごとの判定結果 |
+| `output/quality_gate.json` | PM エージェント向けの pass/fail と改善要否 |
 | `src/generator.py` | 再実行可能な生成器 |
 | `src/evaluate.py` | 評価スクリプト |
 
@@ -149,7 +153,7 @@ uv run python examples/customer_transactions/src/evaluate.py
 | `0_spec_ingest` | 入力仕様を読み取り、機械可読なスキーマと制約計画を作る | `work/inferred_schema.json`, `work/constraint_plan.md` |
 | `1_generation_plan` | 各列の生成方式を設計する | `work/generation_plan.md` |
 | `2_generator_impl` | 生成器を実装し、合成データを出力する | `src/generator.py`, `output/*.csv` |
-| `3_evaluate_and_refine` | 制約・仕様・サンプルに照らして評価し、必要に応じて修正する | `src/evaluate.py`, `output/evaluation_report.md`, `output/constraints_check.csv` |
+| `3_evaluate_and_refine` | 制約・仕様・サンプルに照らして評価し、品質課題があれば生成器を修正して再評価する | `src/evaluate.py`, `output/evaluation_report.md`, `output/constraints_check.csv`, `output/quality_gate.json` |
 
 ## 入力を修正して再実行する
 

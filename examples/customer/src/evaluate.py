@@ -1,7 +1,8 @@
 """合成データ評価器。
 
 生成データを inferred_schema.json / constraints / サンプルデータと比較し、
-output/evaluation_report.md と output/constraints_check.csv を出力する。
+output/evaluation_report.md / output/constraints_check.csv /
+output/quality_gate.json を出力する。
 """
 
 from __future__ import annotations
@@ -100,6 +101,11 @@ def check_schema(df: pd.DataFrame, schema: dict) -> list[str]:
     return notes
 
 
+def schema_matches(df: pd.DataFrame, schema: dict) -> bool:
+    declared = [c["column_name"] for c in schema["columns"]]
+    return declared == list(df.columns)
+
+
 # --- 分布比較 ---------------------------------------------------------------
 
 
@@ -121,6 +127,106 @@ def compare_numeric(synth: pd.Series, sample: pd.Series) -> pd.DataFrame:
     ).round(2)
 
 
+# --- 品質ゲート -------------------------------------------------------------
+
+
+def issue(
+    issue_id: str,
+    severity: str,
+    category: str,
+    message: str,
+    *,
+    table: str = "synthetic_data",
+    column: str | None = None,
+    requires_generator_fix: bool = False,
+    evidence: dict | None = None,
+) -> dict:
+    return {
+        "id": issue_id,
+        "severity": severity,
+        "category": category,
+        "table": table,
+        "column": column,
+        "message": message,
+        "requires_generator_fix": requires_generator_fix,
+        "evidence": evidence or {},
+    }
+
+
+def build_quality_gate(
+    *,
+    constraints_df: pd.DataFrame,
+    schema_ok: bool,
+    relation_checks: dict[str, bool],
+    warnings: list[dict] | None = None,
+) -> dict:
+    blocking_issues: list[dict] = []
+    warning_issues = warnings or []
+
+    if not schema_ok:
+        blocking_issues.append(
+            issue(
+                "schema_mismatch",
+                "blocking",
+                "schema",
+                "列名または列順が inferred_schema.json と一致しません。",
+                requires_generator_fix=True,
+            )
+        )
+
+    violated = constraints_df[constraints_df["violations"] > 0]
+    for row in violated.to_dict(orient="records"):
+        table = str(row.get("table") or "synthetic_data")
+        blocking_issues.append(
+            issue(
+                f"constraint_{row['constraint_id']}",
+                "blocking",
+                "constraint",
+                f"{row['constraint']} に {int(row['violations'])} 件の違反があります。",
+                table=table,
+                requires_generator_fix=True,
+                evidence={
+                    "constraint_id": row["constraint_id"],
+                    "violations": int(row["violations"]),
+                    "total": int(row["total"]),
+                    "violation_rate": float(row["violation_rate"]),
+                    "sample_violation": str(row.get("sample_violation", "")),
+                },
+            )
+        )
+
+    for check_id, ok in relation_checks.items():
+        if not ok:
+            blocking_issues.append(
+                issue(
+                    check_id,
+                    "blocking",
+                    "relationship",
+                    f"列間関係チェック {check_id} が NG です。",
+                    requires_generator_fix=True,
+                )
+            )
+
+    status = "fail" if blocking_issues else "pass"
+    return {
+        "status": status,
+        "requires_refinement": bool(blocking_issues),
+        "blocking_issue_count": len(blocking_issues),
+        "warning_issue_count": len(warning_issues),
+        "blocking_issues": blocking_issues,
+        "warnings": warning_issues,
+        "summary": "品質ゲートを通過しました。" if status == "pass" else "生成器修正が必要な品質課題があります。",
+    }
+
+
+def write_quality_gate(out_path: Path, quality_gate: dict) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(quality_gate, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 # --- レポート出力 -----------------------------------------------------------
 
 
@@ -130,6 +236,7 @@ def write_report(
     synth_df: pd.DataFrame,
     schema: dict,
     constraints_df: pd.DataFrame,
+    quality_gate: dict,
 ) -> None:
     lines: list[str] = []
     lines.append("# 合成データ評価レポート")
@@ -202,6 +309,13 @@ def write_report(
     )
     lines.append(f"- C9 (rank × annual_spend の平均順序): {'OK' if order_ok else 'NG'}")
     lines.append("")
+    lines.append("## 品質ゲート")
+    lines.append(f"- status: **{quality_gate['status']}**")
+    lines.append(f"- requires_refinement: **{str(quality_gate['requires_refinement']).lower()}**")
+    lines.append(f"- blocking_issues: {quality_gate['blocking_issue_count']}")
+    lines.append(f"- warnings: {quality_gate['warning_issue_count']}")
+    lines.append("- 機械可読な判定は `quality_gate.json` を参照。")
+    lines.append("")
     lines.append("## 注意事項")
     lines.append("- 本データは仕様駆動の合成データであり、匿名加工情報ではない。")
     lines.append("- 実データの統計的再現性は保証しない。PoC・画面モック・分析仮説検討用途を想定。")
@@ -218,6 +332,7 @@ def main() -> int:
     parser.add_argument("--schema", default="examples/customer/work/inferred_schema.json")
     parser.add_argument("--report", default="examples/customer/output/evaluation_report.md")
     parser.add_argument("--constraints", default="examples/customer/output/constraints_check.csv")
+    parser.add_argument("--quality-gate", default="examples/customer/output/quality_gate.json")
     args = parser.parse_args()
 
     sample_df = pd.read_csv(args.sample, dtype={"prefecture_code": str, "leave_date": str}, keep_default_na=False)
@@ -227,11 +342,29 @@ def main() -> int:
     constraints_df = check_constraints(synth_df)
     Path(args.constraints).parent.mkdir(parents=True, exist_ok=True)
     constraints_df.to_csv(args.constraints, index=False, encoding="utf-8")
-    write_report(Path(args.report), sample_df, synth_df, schema, constraints_df)
+
+    rank_mean = synth_df.groupby("member_rank")["annual_spend"].mean().round().astype(int).to_dict()
+    relation_checks = {
+        "rank_annual_spend_order": (
+            rank_mean.get("BRONZE", 0)
+            < rank_mean.get("SILVER", 0)
+            < rank_mean.get("GOLD", 0)
+            < rank_mean.get("PLATINUM", 0)
+        )
+    }
+    quality_gate = build_quality_gate(
+        constraints_df=constraints_df,
+        schema_ok=schema_matches(synth_df, schema),
+        relation_checks=relation_checks,
+    )
+    write_quality_gate(Path(args.quality_gate), quality_gate)
+    write_report(Path(args.report), sample_df, synth_df, schema, constraints_df, quality_gate)
 
     print(f"[evaluate] wrote {args.report}")
     print(f"[evaluate] wrote {args.constraints}")
+    print(f"[evaluate] wrote {args.quality_gate}")
     print(f"[evaluate] total violations: {int(constraints_df['violations'].sum())}")
+    print(f"[evaluate] quality gate: {quality_gate['status']}")
     return 0
 
 

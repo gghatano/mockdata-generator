@@ -122,6 +122,13 @@
 - T10 (高額CREDIT/DEBIT >= 0.9): OK
 - T8 (±25%以内 >= 0.6): OK (0.682)
 
+## 品質ゲート
+- status: **pass**
+- requires_refinement: **false**
+- blocking_issues: 0
+- warnings: 0
+- 機械可読な判定は `quality_gate.json` を参照。
+
 ## 注意事項
 - 本データは仕様駆動の合成データであり、匿名加工情報ではない。
 - 実データの統計的再現性は保証しない。PoC・画面モック・分析仮説検討用途を想定。

@@ -140,6 +140,7 @@ def write_report(
     t8: dict,
     t9: pd.DataFrame,
     t10: dict,
+    quality_gate: dict,
 ) -> None:
     lines: list[str] = []
     lines.append("# 合成データ評価レポート（ケース2: 顧客×取引）")
@@ -203,6 +204,13 @@ def write_report(
     else:
         lines.append(f"- T8 (±25%以内 >= 0.6): NG ({t8['within_25pct']})")
     lines.append("")
+    lines.append("## 品質ゲート")
+    lines.append(f"- status: **{quality_gate['status']}**")
+    lines.append(f"- requires_refinement: **{str(quality_gate['requires_refinement']).lower()}**")
+    lines.append(f"- blocking_issues: {quality_gate['blocking_issue_count']}")
+    lines.append(f"- warnings: {quality_gate['warning_issue_count']}")
+    lines.append("- 機械可読な判定は `quality_gate.json` を参照。")
+    lines.append("")
     lines.append("## 注意事項")
     lines.append("- 本データは仕様駆動の合成データであり、匿名加工情報ではない。")
     lines.append("- 実データの統計的再現性は保証しない。PoC・画面モック・分析仮説検討用途を想定。")
@@ -217,6 +225,7 @@ def main() -> int:
     parser.add_argument("--transactions", default="examples/customer_transactions/output/transactions.csv")
     parser.add_argument("--report", default="examples/customer_transactions/output/evaluation_report.md")
     parser.add_argument("--constraints", default="examples/customer_transactions/output/constraints_check.csv")
+    parser.add_argument("--quality-gate", default="examples/customer_transactions/output/quality_gate.json")
     args = parser.parse_args()
 
     cust = pd.read_csv(
@@ -243,15 +252,29 @@ def main() -> int:
     t8 = evaluate_t8(tx, cust)
     t9 = evaluate_t9(tx, cust)
     t10 = evaluate_t10(tx)
+    rank_order_ok = list(t9["mean"].sort_values().index.tolist()) == ["BRONZE", "SILVER", "GOLD", "PLATINUM"]
+    relation_checks = {
+        "t8_recent_amount_matches_annual_spend": t8["within_25pct"] >= 0.6,
+        "t9_rank_transaction_count_order": rank_order_ok,
+        "t10_high_amount_credit_debit_rate": t10["credit_debit_rate"] >= 0.9,
+    }
+    quality_gate = _case1.build_quality_gate(
+        constraints_df=all_violations,
+        schema_ok=True,
+        relation_checks=relation_checks,
+    )
+    _case1.write_quality_gate(Path(args.quality_gate), quality_gate)
 
-    write_report(Path(args.report), cust, tx, c_violations, t_violations, t8, t9, t10)
+    write_report(Path(args.report), cust, tx, c_violations, t_violations, t8, t9, t10, quality_gate)
 
     print(f"[evaluate] wrote {args.report}")
     print(f"[evaluate] wrote {args.constraints}")
+    print(f"[evaluate] wrote {args.quality_gate}")
     print(
         f"[evaluate] violations: customer={int(c_violations['violations'].sum())} "
         f"transaction={int(t_violations['violations'].sum())}"
     )
+    print(f"[evaluate] quality gate: {quality_gate['status']}")
     return 0
 
 

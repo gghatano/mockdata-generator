@@ -28,7 +28,8 @@ post sampling / rule filtering
   ├─ synthetic_data.csv
   ├─ generator.py
   ├─ evaluation_report.md
-  └─ constraints_check.csv
+  ├─ constraints_check.csv
+  └─ quality_gate.json
 ```
 
 ---
@@ -53,7 +54,8 @@ spec-driven-synth-demo/
 ├── output/
 │   ├── synthetic_data.csv
 │   ├── evaluation_report.md
-│   └── constraints_check.csv
+│   ├── constraints_check.csv
+│   └── quality_gate.json
 └── README.md
 ```
 
@@ -177,6 +179,23 @@ output/constraints_check.csv
 
 ```text
 output/evaluation_report.md
+output/quality_gate.json
+```
+
+評価で必須制約違反、スキーマ不一致、明示仕様に反する値域・カテゴリ・日付関係などの品質課題が見つかった場合は、`generator.py` を修正して再生成し、同じ評価を再実行する。サンプル統計との差異が仕様違反ではない場合は、過剰に合わせ込まず、既知の限界または追加仕様が必要な点としてレポートに残す。
+
+`quality_gate.json` は PM エージェントが改善ループの要否を判定するための機械可読な品質ゲートであり、最低限以下を含める。
+
+```json
+{
+  "status": "pass",
+  "requires_refinement": false,
+  "blocking_issue_count": 0,
+  "warning_issue_count": 0,
+  "blocking_issues": [],
+  "warnings": [],
+  "summary": "品質ゲートを通過しました。"
+}
 ```
 
 ---
@@ -397,7 +416,7 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 ## Purpose
 
-生成された合成データを、仕様・サンプルデータ・制約条件に照らして評価し、必要に応じて generator.py を修正する。
+生成された合成データを、仕様・サンプルデータ・制約条件に照らして評価し、品質課題があれば generator.py を修正して再生成・再評価する。
 
 ## Inputs
 
@@ -412,6 +431,7 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 - src/evaluate.py
 - output/evaluation_report.md
 - output/constraints_check.csv
+- output/quality_gate.json
 
 ## Tasks
 
@@ -430,29 +450,42 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 3. 制約違反を constraints_check.csv に出力する。
 
-4. evaluation_report.md に以下を記載する。
+4. quality_gate.json に以下を記載する。
+   - status: pass / fail
+   - requires_refinement: generator.py の修正が必要なら true
+   - blocking_issues: 必須制約違反、スキーマ不一致、明示仕様違反
+   - warnings: 統計的差異、サンプル不足、追加仕様が必要な非ブロッキング課題
+   - summary: PM エージェント向けの短い判定理由
+
+5. evaluation_report.md に以下を記載する。
    - 入力概要
    - 生成概要
    - スキーマ評価
    - 分布評価
    - 相関評価
    - 制約評価
+   - 品質ゲート
    - 主な差異
    - 改善案
    - 注意事項
 
-5. 評価結果に重大な問題がある場合、generator.py を修正する。
+6. 評価結果に重大な問題がある場合、generator.py を修正する。
    - 型不一致
    - 制約違反
    - 明らかな値域逸脱
    - 欠損率の大幅乖離
    - カテゴリ値の仕様違反
 
+7. 修正後は generator.py を再実行して合成データを作り直し、evaluate.py を再実行する。
+
+8. evaluation_report.md には、改善した項目、残った課題、追加仕様が必要な項目を明記する。
+
 ## Rules
 
 - 評価結果をごまかさない。
 - サンプルデータに過剰適合させない。
 - 仕様違反と統計的差異を区別する。
+- generator.py を修正した場合は、必ず再生成と再評価まで行う。
 - 匿名加工済みデータであるとは記載しない。
 - 合成データの利用範囲を明示する。
 
@@ -460,7 +493,10 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 - evaluation_report.md が生成されている。
 - constraints_check.csv が生成されている。
+- quality_gate.json が生成され、status と requires_refinement が機械可読に記録されている。
 - 重大な仕様違反がない。
+- 品質課題に対応して generator.py を修正した場合、修正後データで再評価済みである。
+- 残課題がある場合、その理由と追加で必要な仕様が明記されている。
 - 既知の限界が明記されている。
 ````
 
@@ -498,6 +534,7 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 - output/synthetic_data.csv
 - output/evaluation_report.md
 - output/constraints_check.csv
+- output/quality_gate.json
 
 ## 進め方
 
@@ -537,6 +574,7 @@ uv run python src/evaluate.py --sample input/sample_data.csv --synthetic output/
 * synthetic_data.csv が指定件数で生成されること
 * evaluation_report.md に評価結果が出力されること
 * constraints_check.csv に制約チェック結果が出力されること
+* quality_gate.json に pass/fail と改善要否が出力されること
 * README.md に使い方が記載されていること
 
 ````
@@ -564,4 +602,3 @@ PoC・画面モック・分析仮説検討に使えるデータを迅速に準�
 ```
 
 この線引きを入れておくと、顧客説明・社内レビュー・法務確認で安定します。
-
