@@ -1,11 +1,11 @@
 ---
-name: 1_generation_plan
+name: 2_generation_plan
 description: タスクディレクトリ ($ARGUMENTS) の inferred_schema.json と constraint_plan.md をもとに、各列の生成方式を設計し work/generation_plan.md を作成する。
 ---
 
-# 1_generation_plan
+# 2_generation_plan
 
-合成データの生成方針を設計するステップ。0_spec_ingest の後に実行する。
+合成データの生成方針を設計するステップ。1_spec_ingest の後に実行する。
 
 ## 引数
 
@@ -66,5 +66,5 @@ description: タスクディレクトリ ($ARGUMENTS) の inferred_schema.json �
 
 ## 参考
 
-完全な仕様は `docs/spec.md` の `SKILL: 1_generation_plan` 節を参照。
+完全な仕様は `docs/spec.md` の `SKILL: 2_generation_plan` 節を参照。
 既存実装の参考: `examples/customer/work/generation_plan.md`, `examples/customer_transactions/work/generation_plan.md`。

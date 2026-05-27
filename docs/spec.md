@@ -6,11 +6,17 @@ GReaTではなく、**仕様駆動のPython生成器をLLMに作らせ、実行�
 # 1. 全体ワークフロー
 
 ```text
-入力
+原資料
+  ├─ 原データ
+  ├─ 業務ドキュメント
   ├─ テーブル定義書
-  ├─ サンプルデータ
-  ├─ データ仕様メモ
-  └─ 制約条件
+  └─ 仕様メモ
+      ↓
+input/ 作成
+  ├─ table_definition
+  ├─ sample_data
+  ├─ data_spec.md
+  └─ constraints.md
       ↓
 仕様理解
       ↓
@@ -32,12 +38,28 @@ post sampling / rule filtering
   └─ quality_gate.json
 ```
 
+```mermaid
+flowchart TD
+    A["source/<br/>原データ・仕様書・業務メモ"] --> B["0_input_prepare"]
+    B --> C["input/<br/>table_definition / sample_data / data_spec.md / constraints.md"]
+    C --> D["1_spec_ingest"]
+    D --> E["2_generation_plan"]
+    E --> F["3_generator_impl"]
+    F --> G["4_evaluate_and_refine"]
+    G --> H["output/<br/>合成データ・評価レポート"]
+```
+
 ---
 
 # 2. 推奨ディレクトリ構成
 
 ```text
 spec-driven-synth-demo/
+├── source/
+│   ├── raw_data/
+│   ├── table_definitions/
+│   ├── docs/
+│   └── notes/
 ├── input/
 │   ├── table_definition.xlsx
 │   ├── sample_data.csv
@@ -63,7 +85,32 @@ spec-driven-synth-demo/
 
 # 3. ワークフロー定義
 
-## Step 1. 入力整理
+## Step 0. input/ 作成
+
+目的：原データ・仕様書・業務ドキュメントから、後続ステップが読める `input/` を作成する。
+
+実施内容：
+
+```text
+- 原資料を棚卸しする
+- テーブル定義を抽出する
+- サンプルデータを作成する
+- 業務仕様を data_spec.md に整理する
+- 制約を constraints.md に整理する
+```
+
+成果物：
+
+```text
+input/*table_definition*
+input/*sample_data*
+input/data_spec.md
+input/constraints.md
+```
+
+---
+
+## Step 1. 仕様理解
 
 目的：入力資料から、生成に使う仕様を機械可読化する。
 
@@ -202,21 +249,65 @@ output/quality_gate.json
 
 # 4. SKILL定義案
 
-Claude Code等に渡すなら、以下の4つに分けるのが扱いやすいです。
+Claude Code等に渡すなら、以下の5つに分けるのが扱いやすいです。
 
 ```text
-0_spec_ingest
-1_generation_plan
-2_generator_impl
-3_evaluate_and_refine
+0_input_prepare
+1_spec_ingest
+2_generation_plan
+3_generator_impl
+4_evaluate_and_refine
 ```
 
 ---
 
-# SKILL: 0_spec_ingest
+# SKILL: 0_input_prepare
 
 ```md
-# 0_spec_ingest
+# 0_input_prepare
+
+## Purpose
+
+原データ・仕様書・業務ドキュメントから、合成データ生成パイプラインが参照する input/ 配下のファイルを作成・更新する。
+
+## Inputs
+
+- source/raw_data/, source/table_definitions/, source/docs/, source/notes/ 配下の原資料
+- 既存の業務CSV / TSV / Excel
+- テーブル定義書、ER図、DDL、データ辞書
+- 仕様書、README、業務ルール、制約メモ
+
+## Outputs
+
+- input/*table_definition*
+- input/*sample_data*
+- input/data_spec.md
+- input/constraints.md
+
+## Tasks
+
+1. 原資料を棚卸しする。
+2. テーブル定義を抽出する。
+3. 個人情報や機微情報を直接残さない形でサンプルデータを作成する。
+4. 業務仕様を data_spec.md に整理する。
+5. 制約を constraints.md に整理する。
+
+## Acceptance Criteria
+
+- input/ が存在する。
+- 1つ以上の *table_definition* ファイルがある。
+- 1つ以上の *sample_data* ファイルがある。
+- input/data_spec.md がある。
+- input/constraints.md がある。
+- 明示仕様、推定仕様、仮定、不明点が区別されている。
+```
+
+---
+
+# SKILL: 1_spec_ingest
+
+```md
+# 1_spec_ingest
 
 ## Purpose
 
@@ -281,10 +372,10 @@ Claude Code等に渡すなら、以下の4つに分けるのが扱いやすい�
 
 ---
 
-# SKILL: 1_generation_plan
+# SKILL: 2_generation_plan
 
 ```md
-# 1_generation_plan
+# 2_generation_plan
 
 ## Purpose
 
@@ -343,10 +434,10 @@ inferred_schema.json と constraint_plan.md をもとに、各列の生成方法
 
 ---
 
-# SKILL: 2_generator_impl
+# SKILL: 3_generator_impl
 
 ````md
-# 2_generator_impl
+# 3_generator_impl
 
 ## Purpose
 
@@ -409,10 +500,10 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 ---
 
-# SKILL: 3_evaluate_and_refine
+# SKILL: 4_evaluate_and_refine
 
 ```md
-# 3_evaluate_and_refine
+# 4_evaluate_and_refine
 
 ## Purpose
 
@@ -540,10 +631,11 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 以下のSKILL順に進めてください。
 
-1. 0_spec_ingest
-2. 1_generation_plan
-3. 2_generator_impl
-4. 3_evaluate_and_refine
+1. 0_input_prepare
+2. 1_spec_ingest
+3. 2_generation_plan
+4. 3_generator_impl
+5. 4_evaluate_and_refine
 
 ## 実装方針
 

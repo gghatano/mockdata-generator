@@ -1,7 +1,7 @@
 # mockdata-generator
 
 仕様駆動で合成データを生成するためのエージェントワークフローです。
-テーブル定義書、サンプルデータ、データ仕様、制約条件を入力し、再実行可能な Python 生成器と評価レポートを出力します。
+原データや業務ドキュメントから `input/` を構成し、再実行可能な Python 生成器と評価レポートを出力します。
 
 ## Quickstart
 
@@ -16,32 +16,50 @@ uv sync
 - Python 3.14+
 - uv
 
-### 2. 入力ファイルを配置する
+### 2. 原資料を配置する
 
-タスクごとに `examples/<task_name>/input/` を作成し、以下を配置します。
+タスクごとに `examples/<task_name>/source/` を作成し、`input/` の元になる原資料を配置します。
 
 ```text
-examples/<task_name>/input/
-├── *table_definition.csv   # 列名、型、許容値など
-├── *sample_data.csv        # 統計量・値域の参考サンプル
-├── data_spec.md            # 業務ルールや生成仕様
-└── constraints.md          # 必須/推奨制約
+examples/<task_name>/source/
+├── raw_data/               # 原データ、既存CSV、ダンプなど
+├── table_definitions/      # テーブル定義書、DDL、データ辞書など
+├── docs/                   # 仕様書、業務説明資料、READMEなど
+└── notes/                  # 制約メモ、補足、確認事項など
 ```
 
-複数テーブルの場合は、テーブルごとに `*table_definition.csv` と `*sample_data.csv` を配置します。
+`source/` が原資料の正本です。`input/` は `0_input_prepare` が後続パイプライン向けに作成する整形済み入力として扱います。すでに `input/` が揃っている場合は、`source/` なしで `1_spec_ingest` から始めることもできます。
 
-### 3. 合成データを生成する
+```mermaid
+flowchart TD
+    A["source/<br/>原データ・仕様書・業務メモ"] --> B["0_input_prepare"]
+    B --> C["input/<br/>table_definition / sample_data / data_spec.md / constraints.md"]
+    C --> D["1_spec_ingest"]
+    D --> E["2_generation_plan"]
+    E --> F["3_generator_impl"]
+    F --> G["4_evaluate_and_refine"]
+    G --> H["output/<br/>合成データ・評価レポート"]
+```
 
-Claude Code で次を実行します。
+### 3. PM エージェントに生成を依頼する
+
+Claude Code では次を実行します。
 
 ```text
 /synthesize examples/<task_name>
+```
+
+Codex では、PM エージェントに同じタスクを依頼します。
+
+```text
+synthesize スキルを使って examples/<task_name> の合成データ生成を end-to-end で実行してください。
 ```
 
 例:
 
 ```text
 /synthesize examples/customer
+synthesize スキルを使って examples/university_enrollment の合成データ生成を end-to-end で実行してください。
 ```
 
 生成後は、主に以下のファイルを確認します。
@@ -83,10 +101,11 @@ uv run python examples/customer_transactions/src/evaluate.py
 一括実行ではなく、各ステップを個別に確認しながら進めることもできます。
 
 ```text
-/0_spec_ingest         examples/<task_name>
-/1_generation_plan     examples/<task_name>
-/2_generator_impl      examples/<task_name>
-/3_evaluate_and_refine examples/<task_name>
+/0_input_prepare       examples/<task_name>
+/1_spec_ingest         examples/<task_name>
+/2_generation_plan     examples/<task_name>
+/3_generator_impl      examples/<task_name>
+/4_evaluate_and_refine examples/<task_name>
 ```
 
 ## 詳細ドキュメント
@@ -94,10 +113,11 @@ uv run python examples/customer_transactions/src/evaluate.py
 - [docs/usage.md](docs/usage.md): 詳細な使い方、入力ファイル、実行手順、出力確認
 - [docs/spec.md](docs/spec.md): ワークフロー仕様、設計方針、Acceptance Criteria
 - [.claude/skills/synthesize/SKILL.md](.claude/skills/synthesize/SKILL.md): 一括実行の PM エージェント
-- [.claude/skills/0_spec_ingest/SKILL.md](.claude/skills/0_spec_ingest/SKILL.md): 仕様読み取り
-- [.claude/skills/1_generation_plan/SKILL.md](.claude/skills/1_generation_plan/SKILL.md): 生成方針設計
-- [.claude/skills/2_generator_impl/SKILL.md](.claude/skills/2_generator_impl/SKILL.md): 生成器実装
-- [.claude/skills/3_evaluate_and_refine/SKILL.md](.claude/skills/3_evaluate_and_refine/SKILL.md): 評価と改善
+- [.claude/skills/0_input_prepare/SKILL.md](.claude/skills/0_input_prepare/SKILL.md): input/ 作成
+- [.claude/skills/1_spec_ingest/SKILL.md](.claude/skills/1_spec_ingest/SKILL.md): 仕様読み取り
+- [.claude/skills/2_generation_plan/SKILL.md](.claude/skills/2_generation_plan/SKILL.md): 生成方針設計
+- [.claude/skills/3_generator_impl/SKILL.md](.claude/skills/3_generator_impl/SKILL.md): 生成器実装
+- [.claude/skills/4_evaluate_and_refine/SKILL.md](.claude/skills/4_evaluate_and_refine/SKILL.md): 評価と改善
 
 ## 注意
 
