@@ -1,9 +1,9 @@
 ---
-name: 2_generator_impl
+name: 3_generator_impl
 description: タスクディレクトリ ($ARGUMENTS) の generation_plan.md に基づき、src/generator.py を実装し、output/ に合成データを生成する。
 ---
 
-# 2_generator_impl
+# 3_generator_impl
 
 設計に基づき、再実行可能な Python 生成器を実装するステップ。
 
@@ -83,7 +83,7 @@ description: タスクディレクトリ ($ARGUMENTS) の generation_plan.md に
 
 ## 参考
 
-完全な仕様は `docs/spec.md` の `SKILL: 2_generator_impl` 節を参照。
+完全な仕様は `docs/spec.md` の `SKILL: 3_generator_impl` 節を参照。
 既存実装の参考:
 - 単一テーブル: `examples/customer/src/generator.py`
 - 複数テーブル: `examples/customer_transactions/src/generator.py`（importlib による再利用例も含む）

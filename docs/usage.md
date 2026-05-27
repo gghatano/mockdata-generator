@@ -6,10 +6,21 @@
 ## 基本の流れ
 
 ```text
-1. examples/<task_name>/input/ に入力ファイルを配置する
+1. examples/<task_name>/source/ に原資料を配置する
 2. /synthesize examples/<task_name> を実行する
-3. work/、src/、output/ の成果物を確認する
-4. 必要に応じて入力仕様を直し、再実行する
+3. input/、work/、src/、output/ の成果物を確認する
+4. 必要に応じて source/ または input/ を直し、再実行する
+```
+
+```mermaid
+flowchart TD
+    A["source/<br/>原データ・仕様書・業務メモ"] --> B["0_input_prepare"]
+    B --> C["input/<br/>table_definition / sample_data / data_spec.md / constraints.md"]
+    C --> D["1_spec_ingest"]
+    D --> E["2_generation_plan"]
+    E --> F["3_generator_impl"]
+    F --> G["4_evaluate_and_refine"]
+    G --> H["output/<br/>合成データ・評価レポート"]
 ```
 
 ## タスクディレクトリを作る
@@ -18,6 +29,7 @@
 
 ```text
 examples/<task_name>/
+├── source/
 └── input/
 ```
 
@@ -27,9 +39,32 @@ examples/<task_name>/
 cp -r examples/customer examples/my_task
 ```
 
-## 入力ファイルを配置する
+## 原資料を配置する
 
-`input/` には、生成したいデータの仕様を置きます。
+標準では `source/` に、`input/` の元になる原資料を置きます。
+
+```text
+examples/<task_name>/source/
+├── raw_data/
+├── table_definitions/
+├── docs/
+└── notes/
+```
+
+各ディレクトリの役割は以下です。
+
+| ディレクトリ | 役割 |
+| --- | --- |
+| `raw_data/` | 原データ、既存CSV、TSV、Excel、ダンプなど |
+| `table_definitions/` | テーブル定義書、DDL、ER図、データ辞書など |
+| `docs/` | 仕様書、業務説明資料、README、API仕様など |
+| `notes/` | 制約メモ、補足、確認事項、手作業メモなど |
+
+`source/` が原資料の正本です。原資料そのものを `input/` に混ぜず、`0_input_prepare` で後続ステップ向けに整理します。
+
+## input/ を確認する
+
+`input/` には、後続パイプラインが読む整形済み入力を置きます。`0_input_prepare` が作成しますが、すでに仕様が整理済みの場合は手で用意しても構いません。
 
 ```text
 examples/<task_name>/input/
@@ -62,31 +97,42 @@ examples/customer_transactions/input/
 
 ## 一括実行する
 
-Claude Code で以下を実行します。
+Claude Code では以下を実行します。
 
 ```text
 /synthesize examples/<task_name>
+```
+
+Codex では、PM エージェントに同じタスクを依頼します。
+
+```text
+synthesize スキルを使って examples/<task_name> の合成データ生成を end-to-end で実行してください。
 ```
 
 例:
 
 ```text
 /synthesize examples/customer
+synthesize スキルを使って examples/university_enrollment の合成データ生成を end-to-end で実行してください。
 ```
 
 `/synthesize` は PM エージェントとして動作し、以下のステップを順番に実行します。
 
 ```text
-0_spec_ingest
+0_input_prepare
   ↓
-1_generation_plan
+1_spec_ingest
   ↓
-2_generator_impl
+2_generation_plan
   ↓
-3_evaluate_and_refine
+3_generator_impl
+  ↓
+4_evaluate_and_refine
 ```
 
-最後の `3_evaluate_and_refine` で品質課題が見つかった場合、PM エージェントは `quality_gate.json`、評価レポート、制約チェック結果をもとに `2_generator_impl` へ戻り、生成器を修正してから再生成・再評価します。改善ループ後も残る課題は、追加仕様が必要な点または既知の限界として `evaluation_report.md` に記録します。
+`input/` が未整備の場合は `0_input_prepare` で原資料から作成します。すでに `input/` が揃っている場合は、PM エージェントは `1_spec_ingest` から進めます。
+
+最後の `4_evaluate_and_refine` で品質課題が見つかった場合、PM エージェントは `quality_gate.json`、評価レポート、制約チェック結果をもとに `3_generator_impl` へ戻り、生成器を修正してから再生成・再評価します。改善ループ後も残る課題は、追加仕様が必要な点または既知の限界として `evaluation_report.md` に記録します。
 
 ## 出力を確認する
 
@@ -140,20 +186,22 @@ uv run python examples/customer_transactions/src/evaluate.py
 一括実行ではなく、途中成果物を確認しながら進めたい場合は、各ステップを個別に実行できます。
 
 ```text
-/0_spec_ingest         examples/<task_name>
-/1_generation_plan     examples/<task_name>
-/2_generator_impl      examples/<task_name>
-/3_evaluate_and_refine examples/<task_name>
+/0_input_prepare      examples/<task_name>
+/1_spec_ingest         examples/<task_name>
+/2_generation_plan     examples/<task_name>
+/3_generator_impl      examples/<task_name>
+/4_evaluate_and_refine examples/<task_name>
 ```
 
 ステップごとの主な役割は以下です。
 
 | ステップ | 役割 | 主な出力 |
 | --- | --- | --- |
-| `0_spec_ingest` | 入力仕様を読み取り、機械可読なスキーマと制約計画を作る | `work/inferred_schema.json`, `work/constraint_plan.md` |
-| `1_generation_plan` | 各列の生成方式を設計する | `work/generation_plan.md` |
-| `2_generator_impl` | 生成器を実装し、合成データを出力する | `src/generator.py`, `output/*.csv` |
-| `3_evaluate_and_refine` | 制約・仕様・サンプルに照らして評価し、品質課題があれば生成器を修正して再評価する | `src/evaluate.py`, `output/evaluation_report.md`, `output/constraints_check.csv`, `output/quality_gate.json` |
+| `0_input_prepare` | 原資料から input/ 配下の標準ファイルを作る | `input/*table_definition*`, `input/*sample_data*`, `input/data_spec.md`, `input/constraints.md` |
+| `1_spec_ingest` | 入力仕様を読み取り、機械可読なスキーマと制約計画を作る | `work/inferred_schema.json`, `work/constraint_plan.md` |
+| `2_generation_plan` | 各列の生成方式を設計する | `work/generation_plan.md` |
+| `3_generator_impl` | 生成器を実装し、合成データを出力する | `src/generator.py`, `output/*.csv` |
+| `4_evaluate_and_refine` | 制約・仕様・サンプルに照らして評価し、品質課題があれば生成器を修正して再評価する | `src/evaluate.py`, `output/evaluation_report.md`, `output/constraints_check.csv`, `output/quality_gate.json` |
 
 ## 入力を修正して再実行する
 
@@ -174,7 +222,8 @@ uv run python examples/customer_transactions/src/evaluate.py
 
 - [spec.md](spec.md): ワークフロー仕様、設計方針、Acceptance Criteria
 - [../.claude/skills/synthesize/SKILL.md](../.claude/skills/synthesize/SKILL.md): 一括実行の PM エージェント
-- [../.claude/skills/0_spec_ingest/SKILL.md](../.claude/skills/0_spec_ingest/SKILL.md): 仕様読み取り
-- [../.claude/skills/1_generation_plan/SKILL.md](../.claude/skills/1_generation_plan/SKILL.md): 生成方針設計
-- [../.claude/skills/2_generator_impl/SKILL.md](../.claude/skills/2_generator_impl/SKILL.md): 生成器実装
-- [../.claude/skills/3_evaluate_and_refine/SKILL.md](../.claude/skills/3_evaluate_and_refine/SKILL.md): 評価と改善
+- [../.claude/skills/0_input_prepare/SKILL.md](../.claude/skills/0_input_prepare/SKILL.md): input/ 作成
+- [../.claude/skills/1_spec_ingest/SKILL.md](../.claude/skills/1_spec_ingest/SKILL.md): 仕様読み取り
+- [../.claude/skills/2_generation_plan/SKILL.md](../.claude/skills/2_generation_plan/SKILL.md): 生成方針設計
+- [../.claude/skills/3_generator_impl/SKILL.md](../.claude/skills/3_generator_impl/SKILL.md): 生成器実装
+- [../.claude/skills/4_evaluate_and_refine/SKILL.md](../.claude/skills/4_evaluate_and_refine/SKILL.md): 評価と改善
