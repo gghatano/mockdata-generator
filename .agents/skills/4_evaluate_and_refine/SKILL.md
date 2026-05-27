@@ -1,9 +1,9 @@
 ---
-name: 3_evaluate_and_refine
+name: 4_evaluate_and_refine
 description: タスクディレクトリ ($ARGUMENTS) の合成データを、仕様・サンプル・制約に照らして評価し、必要に応じて generator.py を修正する。evaluation_report.md と constraints_check.csv を出力する。
 ---
 
-# 3_evaluate_and_refine
+# 4_evaluate_and_refine
 
 合成データの品質と制約充足を評価し、必要に応じて生成器を refine するステップ。
 
@@ -58,7 +58,7 @@ description: タスクディレクトリ ($ARGUMENTS) の合成データを、�
    - 欠損率の大幅乖離
    - カテゴリ値の仕様違反
 
-   修正後は `2_generator_impl` の Acceptance Criteria を再確認する。
+   修正後は `3_generator_impl` の Acceptance Criteria を再確認する。
 
 6. **既存ロジックの再利用**:
    - 他タスクの evaluate.py の関数 (`check_constraints` 等) を `importlib` で再利用しても良い（例: `examples/customer_transactions/src/evaluate.py`）。
@@ -80,7 +80,7 @@ description: タスクディレクトリ ($ARGUMENTS) の合成データを、�
 
 ## 参考
 
-完全な仕様は `docs/spec.md` の `SKILL: 3_evaluate_and_refine` 節を参照。
+完全な仕様は `docs/spec.md` の `SKILL: 4_evaluate_and_refine` 節を参照。
 既存実装の参考:
 - 単一テーブル: `examples/customer/src/evaluate.py`
 - 複数テーブル: `examples/customer_transactions/src/evaluate.py`

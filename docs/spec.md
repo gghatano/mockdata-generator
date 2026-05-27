@@ -6,11 +6,17 @@ GReaTではなく、**仕様駆動のPython生成器をLLMに作らせ、実行�
 # 1. 全体ワークフロー
 
 ```text
-入力
+原資料
+  ├─ 原データ
+  ├─ 業務ドキュメント
   ├─ テーブル定義書
-  ├─ サンプルデータ
-  ├─ データ仕様メモ
-  └─ 制約条件
+  └─ 仕様メモ
+      ↓
+input/ 作成
+  ├─ table_definition
+  ├─ sample_data
+  ├─ data_spec.md
+  └─ constraints.md
       ↓
 仕様理解
       ↓
@@ -28,7 +34,19 @@ post sampling / rule filtering
   ├─ synthetic_data.csv
   ├─ generator.py
   ├─ evaluation_report.md
-  └─ constraints_check.csv
+  ├─ constraints_check.csv
+  └─ quality_gate.json
+```
+
+```mermaid
+flowchart TD
+    A["source/<br/>原データ・仕様書・業務メモ"] --> B["0_input_prepare"]
+    B --> C["input/<br/>table_definition / sample_data / data_spec.md / constraints.md"]
+    C --> D["1_spec_ingest"]
+    D --> E["2_generation_plan"]
+    E --> F["3_generator_impl"]
+    F --> G["4_evaluate_and_refine"]
+    G --> H["output/<br/>合成データ・評価レポート"]
 ```
 
 ---
@@ -37,6 +55,11 @@ post sampling / rule filtering
 
 ```text
 spec-driven-synth-demo/
+├── source/
+│   ├── raw_data/
+│   ├── table_definitions/
+│   ├── docs/
+│   └── notes/
 ├── input/
 │   ├── table_definition.xlsx
 │   ├── sample_data.csv
@@ -53,7 +76,8 @@ spec-driven-synth-demo/
 ├── output/
 │   ├── synthetic_data.csv
 │   ├── evaluation_report.md
-│   └── constraints_check.csv
+│   ├── constraints_check.csv
+│   └── quality_gate.json
 └── README.md
 ```
 
@@ -61,7 +85,32 @@ spec-driven-synth-demo/
 
 # 3. ワークフロー定義
 
-## Step 1. 入力整理
+## Step 0. input/ 作成
+
+目的：原データ・仕様書・業務ドキュメントから、後続ステップが読める `input/` を作成する。
+
+実施内容：
+
+```text
+- 原資料を棚卸しする
+- テーブル定義を抽出する
+- サンプルデータを作成する
+- 業務仕様を data_spec.md に整理する
+- 制約を constraints.md に整理する
+```
+
+成果物：
+
+```text
+input/*table_definition*
+input/*sample_data*
+input/data_spec.md
+input/constraints.md
+```
+
+---
+
+## Step 1. 仕様理解
 
 目的：入力資料から、生成に使う仕様を機械可読化する。
 
@@ -177,27 +226,88 @@ output/constraints_check.csv
 
 ```text
 output/evaluation_report.md
+output/quality_gate.json
+```
+
+評価で必須制約違反、スキーマ不一致、明示仕様に反する値域・カテゴリ・日付関係などの品質課題が見つかった場合は、`generator.py` を修正して再生成し、同じ評価を再実行する。サンプル統計との差異が仕様違反ではない場合は、過剰に合わせ込まず、既知の限界または追加仕様が必要な点としてレポートに残す。
+
+`quality_gate.json` は PM エージェントが改善ループの要否を判定するための機械可読な品質ゲートであり、最低限以下を含める。
+
+```json
+{
+  "status": "pass",
+  "requires_refinement": false,
+  "blocking_issue_count": 0,
+  "warning_issue_count": 0,
+  "blocking_issues": [],
+  "warnings": [],
+  "summary": "品質ゲートを通過しました。"
+}
 ```
 
 ---
 
 # 4. SKILL定義案
 
-Claude Code等に渡すなら、以下の4つに分けるのが扱いやすいです。
+Claude Code等に渡すなら、以下の5つに分けるのが扱いやすいです。
 
 ```text
-0_spec_ingest
-1_generation_plan
-2_generator_impl
-3_evaluate_and_refine
+0_input_prepare
+1_spec_ingest
+2_generation_plan
+3_generator_impl
+4_evaluate_and_refine
 ```
 
 ---
 
-# SKILL: 0_spec_ingest
+# SKILL: 0_input_prepare
 
 ```md
-# 0_spec_ingest
+# 0_input_prepare
+
+## Purpose
+
+原データ・仕様書・業務ドキュメントから、合成データ生成パイプラインが参照する input/ 配下のファイルを作成・更新する。
+
+## Inputs
+
+- source/raw_data/, source/table_definitions/, source/docs/, source/notes/ 配下の原資料
+- 既存の業務CSV / TSV / Excel
+- テーブル定義書、ER図、DDL、データ辞書
+- 仕様書、README、業務ルール、制約メモ
+
+## Outputs
+
+- input/*table_definition*
+- input/*sample_data*
+- input/data_spec.md
+- input/constraints.md
+
+## Tasks
+
+1. 原資料を棚卸しする。
+2. テーブル定義を抽出する。
+3. 個人情報や機微情報を直接残さない形でサンプルデータを作成する。
+4. 業務仕様を data_spec.md に整理する。
+5. 制約を constraints.md に整理する。
+
+## Acceptance Criteria
+
+- input/ が存在する。
+- 1つ以上の *table_definition* ファイルがある。
+- 1つ以上の *sample_data* ファイルがある。
+- input/data_spec.md がある。
+- input/constraints.md がある。
+- 明示仕様、推定仕様、仮定、不明点が区別されている。
+```
+
+---
+
+# SKILL: 1_spec_ingest
+
+```md
+# 1_spec_ingest
 
 ## Purpose
 
@@ -262,10 +372,10 @@ Claude Code等に渡すなら、以下の4つに分けるのが扱いやすい�
 
 ---
 
-# SKILL: 1_generation_plan
+# SKILL: 2_generation_plan
 
 ```md
-# 1_generation_plan
+# 2_generation_plan
 
 ## Purpose
 
@@ -324,10 +434,10 @@ inferred_schema.json と constraint_plan.md をもとに、各列の生成方法
 
 ---
 
-# SKILL: 2_generator_impl
+# SKILL: 3_generator_impl
 
 ````md
-# 2_generator_impl
+# 3_generator_impl
 
 ## Purpose
 
@@ -390,14 +500,14 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 ---
 
-# SKILL: 3_evaluate_and_refine
+# SKILL: 4_evaluate_and_refine
 
 ```md
-# 3_evaluate_and_refine
+# 4_evaluate_and_refine
 
 ## Purpose
 
-生成された合成データを、仕様・サンプルデータ・制約条件に照らして評価し、必要に応じて generator.py を修正する。
+生成された合成データを、仕様・サンプルデータ・制約条件に照らして評価し、品質課題があれば generator.py を修正して再生成・再評価する。
 
 ## Inputs
 
@@ -412,6 +522,7 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 - src/evaluate.py
 - output/evaluation_report.md
 - output/constraints_check.csv
+- output/quality_gate.json
 
 ## Tasks
 
@@ -430,29 +541,42 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 3. 制約違反を constraints_check.csv に出力する。
 
-4. evaluation_report.md に以下を記載する。
+4. quality_gate.json に以下を記載する。
+   - status: pass / fail
+   - requires_refinement: generator.py の修正が必要なら true
+   - blocking_issues: 必須制約違反、スキーマ不一致、明示仕様違反
+   - warnings: 統計的差異、サンプル不足、追加仕様が必要な非ブロッキング課題
+   - summary: PM エージェント向けの短い判定理由
+
+5. evaluation_report.md に以下を記載する。
    - 入力概要
    - 生成概要
    - スキーマ評価
    - 分布評価
    - 相関評価
    - 制約評価
+   - 品質ゲート
    - 主な差異
    - 改善案
    - 注意事項
 
-5. 評価結果に重大な問題がある場合、generator.py を修正する。
+6. 評価結果に重大な問題がある場合、generator.py を修正する。
    - 型不一致
    - 制約違反
    - 明らかな値域逸脱
    - 欠損率の大幅乖離
    - カテゴリ値の仕様違反
 
+7. 修正後は generator.py を再実行して合成データを作り直し、evaluate.py を再実行する。
+
+8. evaluation_report.md には、改善した項目、残った課題、追加仕様が必要な項目を明記する。
+
 ## Rules
 
 - 評価結果をごまかさない。
 - サンプルデータに過剰適合させない。
 - 仕様違反と統計的差異を区別する。
+- generator.py を修正した場合は、必ず再生成と再評価まで行う。
 - 匿名加工済みデータであるとは記載しない。
 - 合成データの利用範囲を明示する。
 
@@ -460,7 +584,10 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 - evaluation_report.md が生成されている。
 - constraints_check.csv が生成されている。
+- quality_gate.json が生成され、status と requires_refinement が機械可読に記録されている。
 - 重大な仕様違反がない。
+- 品質課題に対応して generator.py を修正した場合、修正後データで再評価済みである。
+- 残課題がある場合、その理由と追加で必要な仕様が明記されている。
 - 既知の限界が明記されている。
 ````
 
@@ -498,15 +625,17 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 - output/synthetic_data.csv
 - output/evaluation_report.md
 - output/constraints_check.csv
+- output/quality_gate.json
 
 ## 進め方
 
 以下のSKILL順に進めてください。
 
-1. 0_spec_ingest
-2. 1_generation_plan
-3. 2_generator_impl
-4. 3_evaluate_and_refine
+1. 0_input_prepare
+2. 1_spec_ingest
+3. 2_generation_plan
+4. 3_generator_impl
+5. 4_evaluate_and_refine
 
 ## 実装方針
 
@@ -537,6 +666,7 @@ uv run python src/evaluate.py --sample input/sample_data.csv --synthetic output/
 * synthetic_data.csv が指定件数で生成されること
 * evaluation_report.md に評価結果が出力されること
 * constraints_check.csv に制約チェック結果が出力されること
+* quality_gate.json に pass/fail と改善要否が出力されること
 * README.md に使い方が記載されていること
 
 ````
@@ -564,4 +694,3 @@ PoC・画面モック・分析仮説検討に使えるデータを迅速に準�
 ```
 
 この線引きを入れておくと、顧客説明・社内レビュー・法務確認で安定します。
-

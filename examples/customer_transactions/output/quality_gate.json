@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "requires_refinement": false,
+  "blocking_issue_count": 0,
+  "warning_issue_count": 0,
+  "blocking_issues": [],
+  "warnings": [],
+  "summary": "品質ゲートを通過しました。"
+}
