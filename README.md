@@ -59,6 +59,13 @@ synthesize スキルを使って examples/<task_name> の合成データ生成�
 
 ```text
 /synthesize examples/customer
+/synthesize examples/customer_transactions
+```
+
+`examples/customer`(単一テーブル)と `examples/customer_transactions`(複数テーブル)は、`input/` から `work/`・`src/`・`output/` までを生成済みのサンプルです。`examples/university_enrollment` は `input/` のみ用意済みの未実行サンプル(`work/`・`src/`・`output/` は未生成)で、実際に実行して end-to-end の動作を試すための題材として用意しています。
+
+```text
+/synthesize examples/university_enrollment
 synthesize スキルを使って examples/university_enrollment の合成データ生成を end-to-end で実行してください。
 ```
 
@@ -74,11 +81,13 @@ examples/<task_name>/
 │   ├── generator.py
 │   └── evaluate.py
 └── output/
-    ├── synthetic_data.csv
+    ├── synthetic_data.csv        # 単一テーブルの場合
     ├── evaluation_report.md
     ├── constraints_check.csv
     └── quality_gate.json
 ```
+
+合成データの CSV は、単一テーブルなら `output/synthetic_data.csv` の 1 ファイルですが、複数テーブルの場合はテーブル名ごとに分割されます(例: `output/customers.csv`, `output/transactions.csv`)。
 
 `/synthesize` は最後の品質チェック結果を確認し、必須制約違反や明示仕様との不整合があれば、生成器を修正して再生成・再評価する改善ループを回します。PM エージェントは `quality_gate.json` の `requires_refinement` を機械可読な判定として利用し、残る課題は `evaluation_report.md` に明記されます。
 
@@ -112,12 +121,12 @@ uv run python examples/customer_transactions/src/evaluate.py
 
 - [docs/usage.md](docs/usage.md): 詳細な使い方、入力ファイル、実行手順、出力確認
 - [docs/spec.md](docs/spec.md): ワークフロー仕様、設計方針、Acceptance Criteria
-- [.claude/skills/synthesize/SKILL.md](.claude/skills/synthesize/SKILL.md): 一括実行の PM エージェント
-- [.claude/skills/0_input_prepare/SKILL.md](.claude/skills/0_input_prepare/SKILL.md): input/ 作成
-- [.claude/skills/1_spec_ingest/SKILL.md](.claude/skills/1_spec_ingest/SKILL.md): 仕様読み取り
-- [.claude/skills/2_generation_plan/SKILL.md](.claude/skills/2_generation_plan/SKILL.md): 生成方針設計
-- [.claude/skills/3_generator_impl/SKILL.md](.claude/skills/3_generator_impl/SKILL.md): 生成器実装
-- [.claude/skills/4_evaluate_and_refine/SKILL.md](.claude/skills/4_evaluate_and_refine/SKILL.md): 評価と改善
+- [.agents/skills/synthesize/SKILL.md](.agents/skills/synthesize/SKILL.md): 一括実行の PM エージェント
+- [.agents/skills/0_input_prepare/SKILL.md](.agents/skills/0_input_prepare/SKILL.md): input/ 作成
+- [.agents/skills/1_spec_ingest/SKILL.md](.agents/skills/1_spec_ingest/SKILL.md): 仕様読み取り
+- [.agents/skills/2_generation_plan/SKILL.md](.agents/skills/2_generation_plan/SKILL.md): 生成方針設計
+- [.agents/skills/3_generator_impl/SKILL.md](.agents/skills/3_generator_impl/SKILL.md): 生成器実装
+- [.agents/skills/4_evaluate_and_refine/SKILL.md](.agents/skills/4_evaluate_and_refine/SKILL.md): 評価と改善
 
 ## 注意
 

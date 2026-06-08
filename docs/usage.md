@@ -113,6 +113,13 @@ synthesize スキルを使って examples/<task_name> の合成データ生成�
 
 ```text
 /synthesize examples/customer
+/synthesize examples/customer_transactions
+```
+
+`examples/customer`(単一テーブル)と `examples/customer_transactions`(複数テーブル)は、`work/`・`src/`・`output/` まで生成済みのサンプルです。`examples/university_enrollment` は `input/` のみ用意済みの未実行サンプル(`work/`・`src/`・`output/` は未生成)で、実行例を一から試すための題材として利用できます。
+
+```text
+/synthesize examples/university_enrollment
 synthesize スキルを使って examples/university_enrollment の合成データ生成を end-to-end で実行してください。
 ```
 
@@ -148,17 +155,19 @@ examples/<task_name>/
 │   ├── generator.py
 │   └── evaluate.py
 └── output/
-    ├── synthetic_data.csv
+    ├── synthetic_data.csv        # 単一テーブルの場合
     ├── evaluation_report.md
     ├── constraints_check.csv
     └── quality_gate.json
 ```
 
+合成データの CSV は、単一テーブルなら `output/synthetic_data.csv` の 1 ファイルです。複数テーブルの場合はテーブル名ごとに分割され、例えば `examples/customer_transactions` では `output/customers.csv` と `output/transactions.csv` が出力されます。
+
 主に確認するファイルは以下です。
 
 | ファイル | 確認内容 |
 | --- | --- |
-| `output/synthetic_data.csv` | 生成された合成データ |
+| `output/synthetic_data.csv`(複数テーブルは `output/<table>.csv`) | 生成された合成データ |
 | `output/evaluation_report.md` | 評価結果のサマリ |
 | `output/constraints_check.csv` | 制約ごとの判定結果 |
 | `output/quality_gate.json` | PM エージェント向けの pass/fail と改善要否 |
@@ -186,7 +195,7 @@ uv run python examples/customer_transactions/src/evaluate.py
 一括実行ではなく、途中成果物を確認しながら進めたい場合は、各ステップを個別に実行できます。
 
 ```text
-/0_input_prepare      examples/<task_name>
+/0_input_prepare       examples/<task_name>
 /1_spec_ingest         examples/<task_name>
 /2_generation_plan     examples/<task_name>
 /3_generator_impl      examples/<task_name>
@@ -221,9 +230,9 @@ uv run python examples/customer_transactions/src/evaluate.py
 ## 関連ドキュメント
 
 - [spec.md](spec.md): ワークフロー仕様、設計方針、Acceptance Criteria
-- [../.claude/skills/synthesize/SKILL.md](../.claude/skills/synthesize/SKILL.md): 一括実行の PM エージェント
-- [../.claude/skills/0_input_prepare/SKILL.md](../.claude/skills/0_input_prepare/SKILL.md): input/ 作成
-- [../.claude/skills/1_spec_ingest/SKILL.md](../.claude/skills/1_spec_ingest/SKILL.md): 仕様読み取り
-- [../.claude/skills/2_generation_plan/SKILL.md](../.claude/skills/2_generation_plan/SKILL.md): 生成方針設計
-- [../.claude/skills/3_generator_impl/SKILL.md](../.claude/skills/3_generator_impl/SKILL.md): 生成器実装
-- [../.claude/skills/4_evaluate_and_refine/SKILL.md](../.claude/skills/4_evaluate_and_refine/SKILL.md): 評価と改善
+- [../.agents/skills/synthesize/SKILL.md](../.agents/skills/synthesize/SKILL.md): 一括実行の PM エージェント
+- [../.agents/skills/0_input_prepare/SKILL.md](../.agents/skills/0_input_prepare/SKILL.md): input/ 作成
+- [../.agents/skills/1_spec_ingest/SKILL.md](../.agents/skills/1_spec_ingest/SKILL.md): 仕様読み取り
+- [../.agents/skills/2_generation_plan/SKILL.md](../.agents/skills/2_generation_plan/SKILL.md): 生成方針設計
+- [../.agents/skills/3_generator_impl/SKILL.md](../.agents/skills/3_generator_impl/SKILL.md): 生成器実装
+- [../.agents/skills/4_evaluate_and_refine/SKILL.md](../.agents/skills/4_evaluate_and_refine/SKILL.md): 評価と改善

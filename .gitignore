@@ -5,3 +5,9 @@ __pycache__/
 .DS_Store
 .python-version
 .claude/settings.local.json
+
+# スキル接続層: コピー / symlink した実体は追跡しない (README.txt のみ追跡)
+.claude/skills/*
+!.claude/skills/README.txt
+.codex/skills/*
+!.codex/skills/README.txt

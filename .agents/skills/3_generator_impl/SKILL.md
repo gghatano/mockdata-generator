@@ -16,12 +16,14 @@ description: タスクディレクトリ ($ARGUMENTS) の generation_plan.md に
 - `$ARGUMENTS/work/generation_plan.md`
 - `$ARGUMENTS/work/inferred_schema.json`
 - `$ARGUMENTS/work/constraint_plan.md`
-- `$ARGUMENTS/input/*_sample_data.csv`
+- `$ARGUMENTS/input/*sample_data*`（単一: `sample_data.csv` / 複数: `<table>_sample_data.csv`）
 
 ## 出力
 
 - `$ARGUMENTS/src/generator.py`
-- `$ARGUMENTS/output/<table>.csv`（テーブル名に応じてファイル分割。単一テーブルなら `synthetic_data.csv`）
+- 合成データ:
+  - 単一テーブル: `$ARGUMENTS/output/synthetic_data.csv`
+  - 複数テーブル: `$ARGUMENTS/output/<table>.csv`（テーブル名に応じてファイル分割）
 
 ## タスク
 

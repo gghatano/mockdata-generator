@@ -7,9 +7,10 @@ work/generation_plan.md を参照。
 from __future__ import annotations
 
 import argparse
+import json
 import sys
-from dataclasses import dataclass
-from datetime import date, timedelta
+from dataclasses import asdict, dataclass
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -42,6 +43,10 @@ LEAVE_RATE = 0.15
 
 AGE_MEAN = 40.0
 AGE_STD = 17.0
+# data_spec.md: 会員は概ね 15〜85 歳に集中。0〜4歳の会員が出る不自然さを避けるため、
+# 切断正規の下限を AGE_SAMPLING_MIN=15 にして再サンプルする（許容値域 C5 は [0,110] のままだが、
+# 生成側で 15 未満を出さないことで業務的な妥当性を担保する）。
+AGE_SAMPLING_MIN = 15
 AGE_MIN = 0
 AGE_MAX = 110
 
@@ -85,7 +90,7 @@ class GenerationLog:
     raw_generated: int
     removed_c2: int  # leave_date < join_date
     overwritten_c3: int  # age<18 & has_spouse=1 → 0 に上書き
-    removed_c4_iterations: int  # PLATINUM 下限違反の再サンプリング回数
+    c4_forced_to_lower: int  # 再サンプル上限後も下限未達で、下限値に強制クリップした件数
     final_rows: int
 
 
@@ -100,12 +105,13 @@ def _generate_block(rng: np.random.Generator, n: int, log: GenerationLog) -> pd.
     # gender
     gender = rng.choice(GENDER_VALUES, size=n, p=GENDER_WEIGHTS)
 
-    # age: 切断正規。範囲外は再サンプル
+    # age: 切断正規。下限 AGE_SAMPLING_MIN(=15)〜上限 AGE_MAX の範囲外は再サンプル。
+    # data_spec の「概ね15〜85歳」に沿い、0〜14歳の不自然な会員を生成しない。
     age = rng.normal(AGE_MEAN, AGE_STD, size=n).round().astype(int)
-    mask = (age < AGE_MIN) | (age > AGE_MAX)
+    mask = (age < AGE_SAMPLING_MIN) | (age > AGE_MAX)
     while mask.any():
         age[mask] = np.round(rng.normal(AGE_MEAN, AGE_STD, size=mask.sum())).astype(int)
-        mask = (age < AGE_MIN) | (age > AGE_MAX)
+        mask = (age < AGE_SAMPLING_MIN) | (age > AGE_MAX)
 
     # prefecture
     prefecture = rng.choice(ALL_PREFS, size=n, p=ALL_PREF_WEIGHTS)
@@ -140,7 +146,7 @@ def _generate_block(rng: np.random.Generator, n: int, log: GenerationLog) -> pd.
                 draw[need] = rng.lognormal(mean=mu, sigma=sigma, size=need.sum()) * coef[idx][need]
                 need = draw < lower
                 iterations += 1
-            log.removed_c4_iterations += int((draw < lower).sum())
+            log.c4_forced_to_lower += int((draw < lower).sum())
             # それでも未達なら下限値に強制
             draw = np.where(draw < lower, lower, draw)
         spend[idx] = draw
@@ -198,7 +204,7 @@ def generate(rows: int, seed: int) -> tuple[pd.DataFrame, GenerationLog]:
         raw_generated=0,
         removed_c2=0,
         overwritten_c3=0,
-        removed_c4_iterations=0,
+        c4_forced_to_lower=0,
         final_rows=0,
     )
 
@@ -227,6 +233,12 @@ def main() -> int:
     parser.add_argument("--rows", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=str, default="examples/customer/output/synthetic_data.csv")
+    parser.add_argument(
+        "--log",
+        type=str,
+        default="examples/customer/output/generation_log.json",
+        help="生成に使ったコマンド条件と生成ログを記録する JSON の出力先",
+    )
     args = parser.parse_args()
 
     df, log = generate(args.rows, args.seed)
@@ -235,16 +247,33 @@ def main() -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_path, index=False, encoding="utf-8")
 
+    # 出力件数と生成コマンド（rows/seed）の整合を残すため generation_log.json を出力
+    log_payload = {
+        "command": {
+            "rows": args.rows,
+            "seed": args.seed,
+            "invocation": "uv run python examples/customer/src/generator.py "
+            f"--rows {args.rows} --seed {args.seed}",
+        },
+        "log": asdict(log),
+    }
+    log_path = Path(args.log)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        json.dumps(log_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
     print(
         f"[generator] requested={log.requested_rows} "
         f"raw_generated={log.raw_generated} "
         f"final={log.final_rows} "
         f"removed_C2(leave<join)={log.removed_c2} "
         f"overwritten_C3(age<18&spouse)={log.overwritten_c3} "
-        f"C4_PLATINUM_resamples={log.removed_c4_iterations}",
+        f"C4_PLATINUM_forced_to_lower={log.c4_forced_to_lower}",
         file=sys.stderr,
     )
     print(f"[generator] wrote {out_path} ({len(df)} rows)", file=sys.stderr)
+    print(f"[generator] wrote {log_path}", file=sys.stderr)
     return 0
 
 

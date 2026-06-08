@@ -1,5 +1,5 @@
-以下の構成がよいです。
-GReaTではなく、**仕様駆動のPython生成器をLLMに作らせ、実行・評価まで回す方式**です。
+本リポジトリは、合成データ生成のためのワークフロー仕様を定めるリファレンス文書です。
+GReaT 等の学習ベース手法ではなく、**仕様駆動の Python 生成器を LLM に実装させ、実行・評価まで回す方式**を採ります。テーブル定義書・サンプルデータ・業務仕様・制約条件を入力とし、説明可能な生成ロジックと評価レポートを成果物として出力します。
 
 ---
 
@@ -31,7 +31,7 @@ post sampling / rule filtering
 品質評価
       ↓
 出力
-  ├─ synthetic_data.csv
+  ├─ synthetic_data.csv   # 単一テーブル。複数テーブルは <table>.csv に分割
   ├─ generator.py
   ├─ evaluation_report.md
   ├─ constraints_check.csv
@@ -61,8 +61,8 @@ spec-driven-synth-demo/
 │   ├── docs/
 │   └── notes/
 ├── input/
-│   ├── table_definition.xlsx
-│   ├── sample_data.csv
+│   ├── table_definition.csv      # 複数テーブルは <table>_table_definition.csv
+│   ├── sample_data.csv           # 複数テーブルは <table>_sample_data.csv
 │   ├── data_spec.md
 │   └── constraints.md
 ├── work/
@@ -71,19 +71,31 @@ spec-driven-synth-demo/
 │   └── constraint_plan.md
 ├── src/
 │   ├── generator.py
-│   ├── validate.py
 │   └── evaluate.py
 ├── output/
-│   ├── synthetic_data.csv
+│   ├── synthetic_data.csv        # 複数テーブルは <table>.csv に分割
 │   ├── evaluation_report.md
 │   ├── constraints_check.csv
 │   └── quality_gate.json
 └── README.md
 ```
 
+テーブル定義は CSV を主とし、必要に応じて Excel (`table_definition.xlsx`) など他形式を補足的に用いてもよい。単一テーブルの場合は入力 `table_definition.csv` / `sample_data.csv`、出力 `output/synthetic_data.csv` を用い、複数テーブルの場合は入力をテーブル名で接頭した `<table>_table_definition.csv` / `<table>_sample_data.csv`、出力をテーブル名ごとに分割した `output/<table>.csv` とする。
+
 ---
 
 # 3. ワークフロー定義
+
+本節の Step 0-5 は処理の流れを説明するための番号で、実装上の SKILL（後述の「4. SKILL定義案」）とは次のように対応する。Step 4（post sampling / rule filtering）と Step 5（評価レポート作成）は、いずれも `4_evaluate_and_refine` SKILL に含まれる。
+
+| 本節の Step | 対応する SKILL |
+| --- | --- |
+| Step 0. input/ 作成 | `0_input_prepare` |
+| Step 1. 仕様理解 | `1_spec_ingest` |
+| Step 2. 生成方針設計 | `2_generation_plan` |
+| Step 3. generator.py 作成 | `3_generator_impl` |
+| Step 4. post sampling / rule filtering | `4_evaluate_and_refine`（生成後処理の一部） |
+| Step 5. 評価レポート作成 | `4_evaluate_and_refine` |
 
 ## Step 0. input/ 作成
 
@@ -315,7 +327,7 @@ Claude Code等に渡すなら、以下の5つに分けるのが扱いやすい�
 
 ## Inputs
 
-- input/table_definition.xlsx または input/table_definition.csv
+- input/table_definition.csv（補足として input/table_definition.xlsx 等の他形式も可）
 - input/sample_data.csv
 - input/data_spec.md
 - input/constraints.md
@@ -608,7 +620,7 @@ uv run python src/generator.py --rows 10000 --seed 42 --output output/synthetic_
 
 以下のファイルを利用してください。
 
-- input/table_definition.xlsx
+- input/table_definition.csv（補足として .xlsx 等の他形式も可）
 - input/sample_data.csv
 - input/data_spec.md
 - input/constraints.md

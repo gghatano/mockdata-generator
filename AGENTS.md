@@ -17,11 +17,17 @@
 ## ディレクトリ構成
 
 - `.agents/skills/`
-  - AIエージェントから共通利用するスキルを配置する。
+  - AIエージェントから共通利用するスキルを配置する (実体の正本)。
 - `.claude/skills`
-  - `.agents/skills` への参照とする。
+  - `.agents/skills` への接続層。説明用の `README.txt` のみを追跡する。
+  - Linux/macOS では `.agents/skills` への symlink を作成する。
+  - Windows では `.agents/skills` の各スキルを当ディレクトリへコピーする (コピー実体は `.gitignore` で除外)。
+  - セットアップ手順は `.claude/skills/README.txt` に記載する。
 - `.codex/skills`
-  - `.agents/skills` への参照とする。
+  - `.agents/skills` への接続層。説明用の `README.txt` のみを追跡する。
+  - Linux/macOS では `.agents/skills` への symlink を作成する。
+  - Windows では `.agents/skills` の各スキルを当ディレクトリへコピーする (コピー実体は `.gitignore` で除外)。
+  - セットアップ手順は `.codex/skills/README.txt` に記載する。
 
 ## 作業時の注意
 
