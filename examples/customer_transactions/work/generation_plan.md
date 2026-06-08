@@ -67,4 +67,7 @@ S001〜S050 から一様抽選。
 
 ## 再現性
 
-`numpy.random.default_rng(seed)` を顧客→取引で共有。
+顧客マスタと取引で**別の乱数ストリーム**を使う。
+顧客側は `numpy.random.default_rng(seed)`、取引側は `numpy.random.default_rng(seed + 1)`。
+両者を分離することで一方の生成量が他方のサンプリング系列に影響せず、
+`(seed, seed+1)` の組で全体の再現性を保証する。

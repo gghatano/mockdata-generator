@@ -16,7 +16,7 @@ description: タスクディレクトリ ($ARGUMENTS) の inferred_schema.json �
 - `$ARGUMENTS/work/inferred_schema.json`
 - `$ARGUMENTS/work/constraint_plan.md`
 - `$ARGUMENTS/input/data_spec.md`
-- `$ARGUMENTS/input/*_sample_data.csv`
+- `$ARGUMENTS/input/*sample_data*`（単一: `sample_data.csv` / 複数: `<table>_sample_data.csv`）
 
 ## 出力
 

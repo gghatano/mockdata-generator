@@ -1,0 +1,29 @@
+このディレクトリ (.codex/skills) について
+=========================================
+
+このディレクトリは合成データ生成スキルの「接続層」です (Codex 用)。
+スキル実体はここには置きません。実体の正本は `.agents/skills/` にあります。
+
+セットアップ手順
+----------------
+
+このディレクトリを Codex のスキル discovery path として機能させるには、
+お使いの環境に応じて `.agents/skills` の内容をここに用意してください。
+
+- Linux / macOS (symlink):
+    このディレクトリを削除し、`.agents/skills` への symlink を作成します。
+      rm -rf .codex/skills
+      ln -s ../.agents/skills .codex/skills
+
+- Windows (コピー):
+    `.agents/skills/` の各スキルフォルダをこのディレクトリにコピーします。
+      Copy-Item -Recurse ..\..\.agents\skills\* .codex\skills\
+    コピーした実体は `.gitignore` で除外しているため commit されません。
+
+運用ルール
+----------
+
+- スキル実体の編集は必ず `.agents/skills/` 側で行ってください。
+- 接続層 (このディレクトリ) には実体を直接置かないでください
+  (AGENTS.md の MUST NOT に従う)。
+- この README.txt は追跡対象です。コピー / symlink した実体は追跡しません。

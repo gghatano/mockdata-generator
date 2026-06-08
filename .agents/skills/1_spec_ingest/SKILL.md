@@ -16,12 +16,15 @@ description: タスクディレクトリ ($ARGUMENTS) の input/ を読み取り
 
 `$ARGUMENTS/input/` 配下のすべての関連ファイル。典型例：
 
-- `*_table_definition.csv`（または `.xlsx`）: 列名・型・許容値・PK/FK などの仕様
-- `*_sample_data.csv`: 統計量推定用サンプル
+- `input/*table_definition*`: 列名・型・許容値・PK/FK などの仕様。形式は `.csv` を主とする（`.xlsx` も対応可だが、サンプル/例は CSV を想定）。
+- `input/*sample_data*`: 統計量推定用サンプル
 - `data_spec.md`: 業務ルールの自然言語仕様
 - `constraints.md`: 必須/推奨制約
 
-複数テーブルがある場合は、テーブル名がプレフィックスでファイル名に含まれている前提（`student_table_definition.csv` 等）。
+ファイル命名は単一テーブル / 複数テーブルの両方に対応する。後続参照はグロブ `input/*table_definition*` と `input/*sample_data*` を使い、接頭辞の有無に依存しない。
+
+- 単一テーブル: `input/table_definition.csv`, `input/sample_data.csv`
+- 複数テーブル: `input/<table>_table_definition.csv`, `input/<table>_sample_data.csv`（テーブル名がプレフィックス）
 
 ## 出力
 

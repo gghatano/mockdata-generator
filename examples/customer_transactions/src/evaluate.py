@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -27,6 +28,66 @@ ONE_YEAR_AGO = REFERENCE_DATE - timedelta(days=365)
 ALLOWED_STORES = {f"S{i:03d}" for i in range(1, 51)}
 ALLOWED_CATEGORIES = {"FOOD", "DAILY", "APPAREL", "HOME", "BOOKS", "ELECTRONICS"}
 ALLOWED_PAYMENTS = {"CASH", "CREDIT", "DEBIT", "EMONEY", "POINT"}
+
+
+def check_case2_schema(
+    cust: pd.DataFrame, tx: pd.DataFrame, schema: dict
+) -> list[str]:
+    """ケース2のスキーマ整合をチェックし、blocking 扱いの問題を文字列で返す（空なら OK）。
+
+    customer / transaction 両テーブルについて
+      - 列名・列順が inferred_schema.json と一致するか
+      - 宣言された data_type と値が整合するか（case1 のロジックを再利用）
+      - nullable=false の列に欠損がないか（case1 のロジックを再利用）
+    を検証し、さらに transaction の FK 列（member_id）が定義どおり存在するかを確認する。
+    """
+    problems: list[str] = []
+    tables = schema.get("tables", {})
+    frames = {"customer": cust, "transaction": tx}
+
+    for table_name, df in frames.items():
+        tdef = tables.get(table_name)
+        if tdef is None:
+            problems.append(f"{table_name}: inferred_schema.json にテーブル定義がありません。")
+            continue
+
+        declared = [c["column_name"] for c in tdef["columns"]]
+        actual = list(df.columns)
+        if declared != actual:
+            missing = sorted(set(declared) - set(actual))
+            extra = sorted(set(actual) - set(declared))
+            problems.append(
+                f"{table_name}: 列名または列順が不一致 (missing={missing}, extra={extra})"
+            )
+            # 列が揃っていない段階で型・欠損チェックは無意味なのでスキップ
+            continue
+
+        # data_type / nullable の整合（case1 の判定ロジックを再利用）
+        for col in tdef["columns"]:
+            name = col["column_name"]
+            series = df[name]
+            ok, sample = _case1._data_type_ok(series, col.get("data_type", "string"))
+            if not ok:
+                problems.append(
+                    f"{table_name}.{name}: 値が data_type={col.get('data_type')} と不整合 (例 {sample})"
+                )
+            # transaction の FK / PK 等、明示 nullable 指定がない列は非null前提
+            if col.get("nullable", False) is False:
+                n_missing = int(_case1._is_missing(series).sum())
+                if n_missing > 0:
+                    problems.append(
+                        f"{table_name}.{name}: nullable=false の列に欠損が {n_missing} 件"
+                    )
+
+        # FK 列の存在確認
+        for fk in tdef.get("foreign_keys", []):
+            fk_col = fk.get("column")
+            if fk_col and fk_col not in actual:
+                problems.append(
+                    f"{table_name}: FK列 {fk_col} が存在しません（references={fk.get('references')}）。"
+                )
+
+    return problems
 
 
 def check_tx_constraints(tx: pd.DataFrame, cust: pd.DataFrame) -> pd.DataFrame:
@@ -141,6 +202,7 @@ def write_report(
     t9: pd.DataFrame,
     t10: dict,
     quality_gate: dict,
+    schema_problems: list[str] | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append("# 合成データ評価レポート（ケース2: 顧客×取引）")
@@ -149,6 +211,15 @@ def write_report(
     lines.append(f"- 顧客件数: {len(cust)}")
     lines.append(f"- 取引件数: {len(tx)}")
     lines.append(f"- 基準日: {REFERENCE_DATE.isoformat()}")
+    lines.append("")
+
+    lines.append("## スキーマ評価")
+    if schema_problems:
+        lines.append("- 列名・列順・型・FK 検証で **NG**:")
+        for p in schema_problems:
+            lines.append(f"  - {p}")
+    else:
+        lines.append("- customer / transaction の列名・列順・data_type・nullable・FK列はすべて inferred_schema.json と整合。")
     lines.append("")
 
     lines.append("## customer 側 制約評価")
@@ -226,6 +297,7 @@ def main() -> int:
     parser.add_argument("--report", default="examples/customer_transactions/output/evaluation_report.md")
     parser.add_argument("--constraints", default="examples/customer_transactions/output/constraints_check.csv")
     parser.add_argument("--quality-gate", default="examples/customer_transactions/output/quality_gate.json")
+    parser.add_argument("--schema", default="examples/customer_transactions/work/inferred_schema.json")
     args = parser.parse_args()
 
     cust = pd.read_csv(
@@ -258,14 +330,21 @@ def main() -> int:
         "t9_rank_transaction_count_order": rank_order_ok,
         "t10_high_amount_credit_debit_rate": t10["credit_debit_rate"] >= 0.9,
     }
+    schema = json.loads(Path(args.schema).read_text(encoding="utf-8"))
+    schema_problems = check_case2_schema(cust, tx, schema)
+
     quality_gate = _case1.build_quality_gate(
         constraints_df=all_violations,
-        schema_ok=True,
+        schema_ok=not schema_problems,
         relation_checks=relation_checks,
+        schema_problems=schema_problems,
     )
     _case1.write_quality_gate(Path(args.quality_gate), quality_gate)
 
-    write_report(Path(args.report), cust, tx, c_violations, t_violations, t8, t9, t10, quality_gate)
+    write_report(
+        Path(args.report), cust, tx, c_violations, t_violations, t8, t9, t10, quality_gate,
+        schema_problems=schema_problems,
+    )
 
     print(f"[evaluate] wrote {args.report}")
     print(f"[evaluate] wrote {args.constraints}")

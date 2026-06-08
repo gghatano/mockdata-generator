@@ -168,7 +168,10 @@ def generate(customers: int, seed: int) -> tuple[pd.DataFrame, pd.DataFrame, TxL
     # 顧客マスタ: ケース1の generate() に同一 seed を渡す
     customer_df, _ = _customer_gen.generate(customers, seed)
 
-    # 取引: 顧客ごとに生成
+    # 取引: 顧客ごとに生成。
+    # 顧客マスタ生成（上の _customer_gen.generate(customers, seed)）とは別の乱数ストリームを使う。
+    # seed+1 を種にすることで、顧客側のサンプリングと取引側のサンプリングが互いに干渉せず、
+    # かつ (seed, seed+1) の組で全体の再現性を保つ。
     tx_rng = np.random.default_rng(seed + 1)
     all_tx: list[dict] = []
     no_tx = 0
